@@ -1,0 +1,104 @@
+# Teleprompt Commentary configuration
+#
+# This file exhaustively demonstrates the supported configuration contract.
+# The generated starter comments out every example, so no rule is active until
+# its configuration lines are uncommented. Changes are read on demand.
+#
+# Rules are ordered under handlers.<name> or hooks.<name>. Every rule requires an
+# action. Optional condition keys begin with "var:". Every condition in a rule
+# must match, and the final matching rule wins.
+#
+# Conditions are JavaScript regular expressions, not globs. Matching is by
+# substring unless anchors are used. A string is an expression without flags.
+# An array contains the expression followed by individual flags. Stateful g and
+# y flags, duplicate or unsupported flags, and combining u with v are rejected.
+#
+# Command actions are direct argv arrays and never run through a shell. Every
+# string or placeholder becomes exactly one argument, even when its value has
+# spaces. Placeholders may prepend or append text to their resolved value.
+#
+# Decision actions are "allow", "deny", or "prompt". They are valid only for
+# diff_editor, new_file_editor, and command_editor. Hooks and all other handlers
+# accept command actions only.
+
+# configuration_editor
+# Available variable: config_file_path
+# Include a waiting flag when an editor otherwise detaches, because only the
+# directly spawned process can be tracked.
+[[handlers.configuration_editor]]
+"var:config_file_path" = '\.toml$'
+action = ["code", "--wait", { var = "config_file_path" }]
+
+# workspace_opener
+# Available variables: directory_path, group_id
+[[handlers.workspace_opener]]
+"var:directory_path" = ['^/workspace/', 'i']
+action = [
+  "code",
+  "--new-window",
+  { var = "directory_path" },
+  { var = "group_id", prepend = "--group=", append = "-window" },
+]
+
+# diff_editor
+# Available variables: old_content_file_path, new_content_file_path
+# Allowed actions: allow, deny, prompt, or a command
+[[handlers.diff_editor]]
+"var:old_content_file_path" = '\.original$'
+action = "allow"
+
+[[handlers.diff_editor]]
+"var:new_content_file_path" = '\.blocked$'
+action = "deny"
+
+[[handlers.diff_editor]]
+"var:new_content_file_path" = '\.review$'
+action = "prompt"
+
+[[handlers.diff_editor]]
+"var:old_content_file_path" = '.*'
+"var:new_content_file_path" = ['\.md$', 'i', 's']
+action = [
+  "code",
+  "--wait",
+  "--diff",
+  { var = "old_content_file_path" },
+  { var = "new_content_file_path" },
+]
+
+# new_file_editor
+# Available variable: new_file_path
+# Allowed actions: allow, deny, prompt, or a command
+[[handlers.new_file_editor]]
+"var:new_file_path" = '\.md$'
+action = ["code", "--wait", { var = "new_file_path" }]
+
+# command_editor
+# Available variables: command_file_path, command_string
+# Allowed actions: allow, deny, prompt, or a command
+# command_string conditions match the raw agent command.
+[[handlers.command_editor]]
+"var:command_string" = '^rm\s+-rf'
+action = "prompt"
+
+[[handlers.command_editor]]
+"var:command_string" = '.*'
+action = ["code", "--wait", { var = "command_file_path" }]
+
+# assistant_message_end
+# Available variable: assistant_message_text
+# Hook actions must be commands.
+[[hooks.assistant_message_end]]
+action = ["notify-send", { var = "assistant_message_text" }]
+
+# tool_permission_request
+# Available variable: tool_name
+# Hook actions must be commands.
+[[hooks.tool_permission_request]]
+"var:tool_name" = '.*'
+action = ["notify-send", "Permission requested", { var = "tool_name" }]
+
+# agent_settled
+# No variables are available. Hook actions must be commands.
+[[hooks.agent_settled]]
+action = ["notify-send", "Pi is ready for input"]

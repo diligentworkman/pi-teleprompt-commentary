@@ -1,0 +1,60 @@
+{
+  "name": "pi-teleprompt-commentary",
+  "version": "0.0.1",
+  "description": "Teleprompt commentary for Pi coding agent",
+  "keywords": [
+    "pi-package"
+  ],
+  "type": "module",
+  "author": "Paul Amoah",
+  "license": "MIT",
+  "imports": {
+    "#/*": "./extensions/src/*"
+  },
+  "files": [
+    "extensions",
+    "skills",
+    "prompts",
+    "README.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "scripts": {
+    "test": "pnpm run test:unit && pnpm run test:wiring",
+    "test:manual": "pi -e .",
+    "test:unit": "node --test extensions/tests/unit/**/*.ts",
+    "test:wiring": "node --test extensions/tests/wiring/**/*.ts",
+    "typecheck": "tsc",
+    "verify": "pnpm run typecheck && pnpm test",
+    "verify:full": "pnpm run verify && pnpm run test:manual"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "dependencies": {
+    "smol-toml": "^1.8.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.85.1",
+    "@types/node": "^26.5.0",
+    "typescript": "^7.0.2"
+  },
+  "homepage": "https://github.com/paglobal/pi-teleprompt-commentary#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paglobal/pi-teleprompt-commentary.git"
+  },
+  "bugs": {
+    "url": "https://github.com/paglobal/pi-teleprompt-commentary/issues"
+  }
+}
