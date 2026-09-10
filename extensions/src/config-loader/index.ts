@@ -1,4 +1,10 @@
-import type { ConfigLoader, ConfigurationLoaderDependencies } from "./types.ts";
+import type {
+  ConfigLoader,
+  ConfigurationLoaderDependencies,
+  HandlerCategory,
+  ResolvedHandlerAction,
+  VariablesFor,
+} from "./types.ts";
 import {
   expandCommand,
   loadConfiguration,
@@ -21,16 +27,25 @@ export function createConfigLoader(
     load() {
       return loadConfiguration(dependencies);
     },
-    async resolveHandler({ category, variables }) {
+    async resolveHandler<TCategory extends HandlerCategory>({
+      category,
+      variables,
+    }: {
+      category: TCategory;
+      variables: VariablesFor<TCategory>;
+    }): Promise<ResolvedHandlerAction<TCategory> | undefined> {
       const rawAction = resolveRawAction({
         rules: (await loadConfiguration(dependencies)).handlers[category] ?? [],
         variables,
       });
       if (rawAction === undefined || typeof rawAction === "string") {
-        return rawAction;
+        return rawAction as ResolvedHandlerAction<TCategory> | undefined;
       }
 
-      return expandCommand({ command: rawAction, variables });
+      return expandCommand({
+        command: rawAction,
+        variables,
+      }) as ResolvedHandlerAction<TCategory>;
     },
     async resolveHook({ hook, variables }) {
       const rawAction = resolveRawAction({

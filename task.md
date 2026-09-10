@@ -62,14 +62,14 @@ This checklist turns [`implementation_plan.md`](./implementation_plan.md) into s
 
 ## 4. Workspace State, Persistence, and Commands
 
-- [ ] Treat canonical cwd as the automatically permitted primary workspace and implement canonical ordered additional-workspace state with exact-duplicate rejection and preserved overlaps (see `plan_modifications.md`).
-- [ ] Implement versioned full snapshots and active-branch restoration from the nearest valid entry.
-- [ ] Implement `/tc:workspace-add`, `/tc:workspace-remove`, and `/tc:workspace-list` with primary/additional workspace wording and separate listing.
-- [ ] Persist snapshots before resource reloads and treat reload as terminal to the command handler.
-- [ ] Implement `/tc:workspace-open` and `/tc:workspaces-open` with per-invocation group IDs and generic rule variables.
-- [ ] Test primary/additional separation, duplicates, parent/child roots, removal to empty, branch divergence, argument/input/select flows, group IDs, and partial opener failures.
-- [ ] Manually exercise every workspace command and session resume/tree behavior.
-- [ ] Run typechecking and all tests.
+- [x] Derive the automatically permitted primary workspace from current `ctx.cwd` on demand without caching or persisting it; retain only canonical ordered additional-workspace state, with exact-duplicate rejection and preserved overlaps (see `plan_modifications.md`).
+- [x] Implement unversioned full snapshots shaped as `{ additionalWorkspaces: string[] }` and active-branch restoration from the nearest valid entry (see `plan_modifications.md`).
+- [x] Implement `/tc:workspace-add`, `/tc:workspace-remove`, and `/tc:workspace-list` with primary/additional workspace wording, separate listing, and confirmation before effective state changes (see `plan_modifications.md`).
+- [x] Persist snapshots before resource reloads and treat reload as terminal to the command handler.
+- [x] Implement `/tc:workspace-open` and `/tc:workspaces-open` with per-invocation group IDs and generic rule variables.
+- [x] Test primary/additional separation, duplicates, parent/child roots, removal to empty, branch divergence, argument/input/select flows, group IDs, and partial opener failures.
+- [x] Manually exercise every workspace command and session resume/tree behavior.
+- [x] Run typechecking and all tests.
 
 **Review checkpoint:** Approve workspace state, branching behavior, and command UX.
 

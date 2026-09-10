@@ -18,6 +18,7 @@
 
 - Start by agreeing on the root-facing contract and stub every immediate dependency.
 - Do not test an unfinished root or a function that depends on a stub.
+- Prefer testing declarative schemas through their completed consuming behavior (such as parsing or restoration), rather than creating standalone schema specs. Verify project-specific validation contracts, not validation-library mechanics; avoid duplicating that coverage across layers.
 - Work from the dependency leaves upward: implement one dependency-free function, review it, add its focused spec, and have the user run it before moving upward.
 - Prioritize correctness, clarity, and reviewability over implementation speed. Do not move faster than the current change can be understood and reviewed.
 - Avoid adding multiple functions at once unless they are necessary stubs for one parent contract.
@@ -30,6 +31,7 @@
 - Use a direct parameter when a project-defined function accepts exactly one argument. Use a named parameter object when it accepts multiple arguments; framework callbacks and third-party APIs retain their required signatures.
 - Use block statements for `if`/control-flow bodies and functions. Avoid terse one-line arrow functions except when the user explicitly prefers one.
 - Preserve the user's established formatting. Ask before resolving ambiguous formatting choices.
+- Use blank lines sparingly. Separate top-level declarations and functions. Within a block, a blank line may precede a return when statements come before it. Do not insert blank lines merely to separate adjacent guards or sequential implementation phases.
 - Treat specs as executable documentation: they must read clearly from top to bottom, use deliberate behavioral grouping and names, hide incidental setup behind readable helpers, and avoid brittle or implementation-heavy assertions.
 - Name shared conceptual test values once at their nearest common scope. Avoid repeated literals, setup, and expected values within one spec when they represent the same concept; duplication across specs or features is acceptable when their test dynamics differ.
 - Keep test machinery local to its spec file, generally as module-level helpers outside `describe`/`it`. Helpers may arrange inputs, dependencies, fakes, and captured outputs, but must not contain assertions; every assertion remains visible in its `it` block. Do not build shared cross-spec fixture, harness, or fake frameworks; tests may repeat boundary setup to remain independent and purpose-specific.

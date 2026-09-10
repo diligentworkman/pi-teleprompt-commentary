@@ -1,5 +1,6 @@
 import type {
   availableVariables,
+  commandOnlyHandlerCategories,
   decisions,
   handlerCategories,
   hookNames,
@@ -31,6 +32,14 @@ export type Action = Decision | Command;
 export type ResolvedCommand = [executable: string, ...args: string[]];
 
 export type ResolvedAction = Decision | ResolvedCommand;
+
+export type CommandOnlyHandlerCategory =
+  (typeof commandOnlyHandlerCategories)[number];
+
+export type ResolvedHandlerAction<TCategory extends HandlerCategory> =
+  TCategory extends CommandOnlyHandlerCategory
+    ? ResolvedCommand
+    : ResolvedAction;
 
 export type RegexSpec = {
   source: string;
@@ -89,7 +98,7 @@ export type ConfigLoader = {
   }: {
     category: TCategory;
     variables: VariablesFor<TCategory>;
-  }): Promise<ResolvedAction | undefined>;
+  }): Promise<ResolvedHandlerAction<TCategory> | undefined>;
   resolveHook<THook extends HookName>({
     hook,
     variables,

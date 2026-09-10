@@ -1,6 +1,6 @@
 import type { ProcessCompletion } from "#/process/index.ts";
 
-export const messages = {
+export const configEditMessages = {
   usage: "Usage: /tc:edit-config",
   saved: "Configuration saved.",
   cancelled: "Configuration edit cancelled.",

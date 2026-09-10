@@ -53,9 +53,13 @@ export const availableVariables = {
   ...availableHookVariables,
 } as const satisfies Record<RuleContext, readonly VariableName[]>;
 
-export const commandOnlyCategories = new Set<RuleContext>([
+export const commandOnlyHandlerCategories = [
   "configuration_editor",
   "workspace_opener",
+] as const satisfies readonly HandlerCategory[];
+
+export const commandOnlyCategories = new Set<RuleContext>([
+  ...commandOnlyHandlerCategories,
   ...hookNames,
 ]);
 

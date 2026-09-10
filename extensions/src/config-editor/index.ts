@@ -1,4 +1,4 @@
-import type { ConfigLoader, ResolvedCommand } from "#/config-loader/index.ts";
+import type { ConfigLoader } from "#/config-loader/index.ts";
 import type {
   ConfigEditor,
   ConfigEditorDependencies,
@@ -6,7 +6,7 @@ import type {
 } from "./types.ts";
 
 export { commands } from "./constants.ts";
-export { errorMessageTemplates, messages } from "./messages.ts";
+export { configEditMessages, errorMessageTemplates } from "./messages.ts";
 export type {
   ConfigEditor,
   ConfigEditorDependencies,
@@ -20,22 +20,17 @@ export {
   writeConfigurationFileAtomically,
 } from "./utils.ts";
 
-export async function resolveConfigurationEditorCommand({
+export function resolveConfigurationEditorCommand({
   configLoader,
   configFilePath,
 }: {
   configLoader: ConfigLoader;
   configFilePath: string;
-}): Promise<ResolvedCommand | undefined> {
-  const action = await configLoader.resolveHandler({
+}) {
+  return configLoader.resolveHandler({
     category: "configuration_editor",
     variables: { config_file_path: configFilePath },
   });
-  if (action === undefined) {
-    return undefined;
-  }
-
-  return action as ResolvedCommand;
 }
 
 export function createConfigEditor(
