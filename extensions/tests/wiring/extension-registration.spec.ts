@@ -5,7 +5,7 @@ import telepromptCommentary from "#/index.ts";
 import { commands as workspaceCommands } from "#/workspaces/index.ts";
 
 function collectEntryPointCommandNames() {
-  const commandNames: string[] = [];
+  const commandNames: Array<string> = [];
   telepromptCommentary({
     on() {},
     registerCommand(name: string) {

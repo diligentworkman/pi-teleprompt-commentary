@@ -1,3 +1,4 @@
+import { getErrorMessage, isErrorWithCode } from "#/errors/index.ts";
 import { join } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { z } from "zod";
@@ -56,12 +57,8 @@ export function resolveConfigPath({
   );
 }
 
-export function isMissingConfigurationFileError(error: unknown): boolean {
-  if (!(error instanceof Error) || !("code" in error)) {
-    return false;
-  }
-
-  return error.code === "ENOENT";
+export function isMissingConfigurationFileError(error: unknown) {
+  return isErrorWithCode({ error, code: "ENOENT" });
 }
 
 export async function loadConfiguration(
@@ -74,7 +71,7 @@ export async function loadConfiguration(
     if (isMissingConfigurationFileError(error)) {
       return createEmptyConfiguration();
     }
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = getErrorMessage(error);
     dependencies.reportConfigurationWarning(
       errorMessageTemplates.configurationFileReadFailed(errorMessage),
     );
@@ -107,10 +104,8 @@ export function parseConfigurationSource(
     let errorMessage: string;
     if (error instanceof z.ZodError) {
       errorMessage = z.prettifyError(error);
-    } else if (error instanceof Error) {
-      errorMessage = error.message;
     } else {
-      errorMessage = String(error);
+      errorMessage = getErrorMessage(error);
     }
 
     return {
@@ -146,7 +141,7 @@ export function validateTomlDocument(
 export function convertRawConfigurationDocument(
   rawConfigurationDocument: RawConfigurationDocument,
 ): ConfigurationConversionResult {
-  const issues: ConfigurationIssue[] = [];
+  const issues: Array<ConfigurationIssue> = [];
   const configuration: TelepromptConfig = {
     handlers: convertHandlerRules({
       rawHandlers: rawConfigurationDocument.handlers,
@@ -166,7 +161,7 @@ export function convertHandlerRules({
   issues,
 }: {
   rawHandlers: RawConfigurationDocument["handlers"];
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): TelepromptConfig["handlers"] {
   const convertedHandlers: TelepromptConfig["handlers"] = {};
   for (const [categoryName, rawRules] of Object.entries(rawHandlers ?? {})) {
@@ -191,7 +186,7 @@ export function convertHookRules({
   issues,
 }: {
   rawHooks: RawConfigurationDocument["hooks"];
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): TelepromptConfig["hooks"] {
   const convertedHooks: TelepromptConfig["hooks"] = {};
   for (const [hookName, rawRules] of Object.entries(rawHooks ?? {})) {
@@ -202,7 +197,7 @@ export function convertHookRules({
       });
       continue;
     }
-    const convertedRules: HookRule[] = [];
+    const convertedRules: Array<HookRule> = [];
     for (const [ruleIndex, rawRule] of rawRules.entries()) {
       const convertedRule = convertRawRule({
         category: parsedHookName.data as HandlerCategory,
@@ -234,10 +229,10 @@ export function convertHandlerCategoryRules({
   issues,
 }: {
   category: HandlerCategory;
-  rawRules: Record<string, unknown>[];
-  issues: ConfigurationIssue[];
-}): Rule[] {
-  const convertedRules: Rule[] = [];
+  rawRules: Array<Record<string, unknown>>;
+  issues: Array<ConfigurationIssue>;
+}): Array<Rule> {
+  const convertedRules: Array<Rule> = [];
   for (const [ruleIndex, rawRule] of rawRules.entries()) {
     const convertedRule = convertRawRule({
       category,
@@ -262,7 +257,7 @@ export function convertRawRule({
   category: HandlerCategory;
   rawRule: Record<string, unknown>;
   ruleIndex: number;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): Rule | undefined {
   if (!validateRawRuleFields({ category, rawRule, ruleIndex, issues })) {
     return undefined;
@@ -290,7 +285,7 @@ export function validateRawRuleFields({
   category: HandlerCategory;
   rawRule: Record<string, unknown>;
   ruleIndex: number;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): boolean {
   let hasOnlySupportedFields = true;
   for (const fieldName of Object.keys(rawRule)) {
@@ -321,7 +316,7 @@ function convertRuleConditions({
   category: HandlerCategory;
   rawRule: Record<string, unknown>;
   ruleIndex: number;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): Rule["conditions"] | undefined {
   const conditions: Rule["conditions"] = {};
   let hasValidConditions = true;
@@ -364,7 +359,7 @@ export function convertConditionVariableName({
   category: HandlerCategory;
   fieldName: string;
   ruleIndex: number;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): VariableName | undefined {
   const parsedVariableName = variableNameSchema.safeParse(
     fieldName.slice("var:".length),
@@ -381,7 +376,7 @@ export function convertConditionVariableName({
     return undefined;
   }
   const variableName = parsedVariableName.data;
-  const categoryVariableNames: readonly VariableName[] =
+  const categoryVariableNames: ReadonlyArray<VariableName> =
     availableVariables[category];
   if (!categoryVariableNames.includes(variableName)) {
     issues.push({
@@ -409,7 +404,7 @@ export function convertRegexSpecification({
   fieldName: string;
   category: HandlerCategory;
   ruleIndex: number;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): RegexSpec | undefined {
   const parsedRegexValue = regexValueSchema.safeParse(rawRegexValue);
   if (!parsedRegexValue.success) {
@@ -450,7 +445,7 @@ export function convertRegexSpecification({
   try {
     new RegExp(source, flags);
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = getErrorMessage(error);
     issues.push({
       message: errorMessageTemplates.invalidRegexSpecification({
         fieldName,
@@ -475,7 +470,7 @@ function convertRuleAction({
   category: HandlerCategory;
   rawRule: Record<string, unknown>;
   ruleIndex: number;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): Action | undefined {
   const rawAction = convertRawActionValue({
     rawRule,
@@ -512,8 +507,8 @@ export function convertRawActionValue({
   rawRule: Record<string, unknown>;
   category: HandlerCategory;
   ruleIndex: number;
-  issues: ConfigurationIssue[];
-}): string | unknown[] | undefined {
+  issues: Array<ConfigurationIssue>;
+}): string | Array<unknown> | undefined {
   const rawAction = rawRule.action;
   if (rawAction === undefined) {
     issues.push({
@@ -548,7 +543,7 @@ export function convertDecisionAction({
   rawAction: string;
   category: HandlerCategory;
   ruleIndex: number;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): Action | undefined {
   const parsedDecision = decisionSchema.safeParse(rawAction);
   if (!parsedDecision.success) {
@@ -582,10 +577,10 @@ export function convertCommandAction({
   ruleIndex,
   issues,
 }: {
-  rawAction: unknown[];
+  rawAction: Array<unknown>;
   category: HandlerCategory;
   ruleIndex: number;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): Command | undefined {
   const rawCommand = validateRawCommand({
     rawAction,
@@ -596,7 +591,7 @@ export function convertCommandAction({
   if (rawCommand === undefined) {
     return undefined;
   }
-  const convertedCommandTokens: CommandToken[] = [rawCommand[0]];
+  const convertedCommandTokens: Array<CommandToken> = [rawCommand[0]];
   let hasValidCommandTokens = true;
   for (const [tokenIndex, rawToken] of rawCommand.slice(1).entries()) {
     const commandToken = convertCommandToken({
@@ -625,11 +620,11 @@ export function validateRawCommand({
   ruleIndex,
   issues,
 }: {
-  rawAction: unknown[];
+  rawAction: Array<unknown>;
   category: HandlerCategory;
   ruleIndex: number;
-  issues: ConfigurationIssue[];
-}): [string, ...unknown[]] | undefined {
+  issues: Array<ConfigurationIssue>;
+}): [string, ...Array<unknown>] | undefined {
   if (rawAction.length === 0) {
     issues.push({
       message: errorMessageTemplates.emptyCommandAction({
@@ -666,7 +661,7 @@ export function convertCommandToken({
   category: HandlerCategory;
   ruleIndex: number;
   tokenIndex: number;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): CommandToken | undefined {
   if (typeof rawToken === "string") {
     return rawToken;
@@ -702,7 +697,7 @@ function convertPlaceholderToken({
   category: HandlerCategory;
   ruleIndex: number;
   tokenIndex: number;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): Placeholder | undefined {
   const parsedPlaceholder = validatePlaceholderToken({
     rawToken,
@@ -735,7 +730,7 @@ export function validatePlaceholderToken({
   category: HandlerCategory;
   ruleIndex: number;
   tokenIndex: number;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): Placeholder | undefined {
   const parsedPlaceholder = placeholderSchema.safeParse(rawToken);
   if (!parsedPlaceholder.success) {
@@ -765,9 +760,9 @@ export function validatePlaceholderVariable({
   category: HandlerCategory;
   ruleIndex: number;
   tokenIndex: number;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 }): Placeholder | undefined {
-  const categoryVariableNames: readonly VariableName[] =
+  const categoryVariableNames: ReadonlyArray<VariableName> =
     availableVariables[category];
   if (!categoryVariableNames.includes(placeholder.var)) {
     issues.push({
@@ -788,7 +783,7 @@ export function resolveRawAction<TAction extends Action>({
   rules,
   variables,
 }: {
-  rules: Rule<TAction>[];
+  rules: Array<Rule<TAction>>;
   variables: HandlerVariables;
 }): TAction | undefined {
   let resolvedAction: TAction | undefined;
@@ -833,7 +828,7 @@ export function expandCommand({
   command: Command;
   variables: HandlerVariables;
 }) {
-  const expandedCommand: string[] = [];
+  const expandedCommand: Array<string> = [];
   for (const commandToken of command) {
     if (typeof commandToken === "string") {
       expandedCommand.push(commandToken);

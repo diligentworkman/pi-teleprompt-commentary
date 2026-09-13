@@ -1,1 +1,6 @@
-export { resolveInputPath } from "./utils.ts";
+export {
+  extractToolPaths,
+  isPathWithinWorkspace,
+  resolveCanonicalPath,
+  resolveInputPath,
+} from "./utils.ts";

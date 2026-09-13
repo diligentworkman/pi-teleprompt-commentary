@@ -28,8 +28,8 @@ export type RunningProcess = {
 };
 
 export type ProcessRunner = {
-  start({ command }: { command: [string, ...string[]] }): RunningProcess;
-  cleanup(): Promise<TerminationOutcome[]>;
+  start({ command }: { command: [string, ...Array<string>] }): RunningProcess;
+  cleanup(): Promise<Array<TerminationOutcome>>;
 };
 
 export type SpawnProcess = {
@@ -39,7 +39,7 @@ export type SpawnProcess = {
     options,
   }: {
     executable: string;
-    args: string[];
+    args: Array<string>;
     options: SpawnOptions;
   }): ChildProcess;
 };

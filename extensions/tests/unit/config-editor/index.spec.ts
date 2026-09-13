@@ -12,15 +12,15 @@ function createEditorHarness({
   completion = { type: "exited", exitCode: 0, signal: null },
   currentSource = "current configuration",
 }: {
-  configuredEditor?: [string, ...string[]];
+  configuredEditor?: [string, ...Array<string>];
   piEditorOutcome: PiEditorOutcome;
   completion?: ProcessCompletion;
   currentSource?: string;
 }) {
   const existingSource = "existing configuration";
-  const events: string[] = [];
-  const savedSources: string[] = [];
-  const failures: ProcessCompletion[] = [];
+  const events: Array<string> = [];
+  const savedSources: Array<string> = [];
+  const failures: Array<ProcessCompletion> = [];
   const processRunner: ProcessRunner = {
     start({ command }) {
       events.push(`start:${JSON.stringify(command)}`);
@@ -162,7 +162,7 @@ describe("configuration editor", () => {
     }
   });
   it("runs a configured direct-argv editor and reports its completion", async () => {
-    const configuredEditor: [string, ...string[]] = [
+    const configuredEditor: [string, ...Array<string>] = [
       "editor",
       "--wait",
       "path with spaces",

@@ -1,3 +1,4 @@
+import { toError } from "#/errors/index.ts";
 import { spawn, type ChildProcess } from "node:child_process";
 import { errorMessageTemplates } from "./messages.ts";
 import type {
@@ -123,7 +124,7 @@ function requestTermination({
       return new Error(errorMessageTemplates.terminationRequestFailed());
     }
   } catch (error) {
-    return error instanceof Error ? error : new Error(String(error));
+    return toError(error);
   }
 }
 
@@ -160,7 +161,7 @@ function completionObservedBeforeTimeout({
 export function createSpawnFailure(error: unknown): RunningProcess {
   const completion = Promise.resolve<ProcessCompletion>({
     type: "spawn-failed",
-    error: error instanceof Error ? error : new Error(String(error)),
+    error: toError(error),
   });
 
   return {

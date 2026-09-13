@@ -42,7 +42,7 @@ const invalidConfigurationMessagePrefix = new RegExp(
 function createLoadConfigurationHarness(
   readConfigurationFile: () => Promise<string>,
 ) {
-  const warnings: string[] = [];
+  const warnings: Array<string> = [];
 
   return {
     warnings,
@@ -102,7 +102,7 @@ describe("configuration loader utilities", () => {
   });
   describe("validateRawRuleFields", () => {
     it("rejects unsupported fields while retaining action conditions", () => {
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.equal(
         validateRawRuleFields({
           category: "new_file_editor",
@@ -137,7 +137,7 @@ describe("configuration loader utilities", () => {
   });
   describe("convertConditionVariableName", () => {
     it("converts a known condition variable available to its category", () => {
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.equal(
         convertConditionVariableName({
           category: "new_file_editor",
@@ -150,7 +150,7 @@ describe("configuration loader utilities", () => {
       assert.deepEqual(issues, []);
     });
     it("rejects unknown and unavailable condition variables", () => {
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.equal(
         convertConditionVariableName({
           category: "new_file_editor",
@@ -192,7 +192,7 @@ describe("configuration loader utilities", () => {
     const category = "command_editor";
 
     it("converts a regex source and supported flags", () => {
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.deepEqual(
         convertRegexSpecification({
           rawRegexValue: ["^remove", "i", "s"],
@@ -227,7 +227,7 @@ describe("configuration loader utilities", () => {
     });
     it("rejects stateful and incompatible regex flags", () => {
       const regexSource = ".*";
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.equal(
         convertRegexSpecification({
           rawRegexValue: [regexSource, "g"],
@@ -276,7 +276,7 @@ describe("configuration loader utilities", () => {
   describe("convertRawActionValue", () => {
     const category = "new_file_editor";
     it("rejects missing and malformed actions", () => {
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.equal(
         convertRawActionValue({
           rawRule: {},
@@ -314,7 +314,7 @@ describe("configuration loader utilities", () => {
   describe("convertDecisionAction", () => {
     const decisionCategory = "new_file_editor";
     it("converts decisions allowed by their action context", () => {
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.equal(
         convertDecisionAction({
           rawAction: "prompt",
@@ -328,7 +328,7 @@ describe("configuration loader utilities", () => {
     });
     it("rejects invalid decisions and decisions in command-only categories", () => {
       const commandOnlyCategory = "configuration_editor";
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       const invalidDecision = decisionSchema.safeParse("review");
       assert.equal(
         convertDecisionAction({
@@ -369,7 +369,7 @@ describe("configuration loader utilities", () => {
   describe("validateRawCommand", () => {
     const category = "new_file_editor";
     it("validates command executables", () => {
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.deepEqual(
         validateRawCommand({
           rawAction: ["code", "--wait"],
@@ -424,7 +424,7 @@ describe("configuration loader utilities", () => {
       const invalidPlaceholder = { var: "new_file_path", unknown: true };
       const invalidPlaceholderResult =
         placeholderSchema.safeParse(invalidPlaceholder);
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.deepEqual(
         validatePlaceholderToken({
           rawToken: validPlaceholder,
@@ -463,7 +463,7 @@ describe("configuration loader utilities", () => {
     it("validates placeholder variable availability", () => {
       const availablePlaceholder = { var: "new_file_path" } as const;
       const unavailablePlaceholder = { var: "command_string" } as const;
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.deepEqual(
         validatePlaceholderVariable({
           placeholder: availablePlaceholder,
@@ -503,7 +503,7 @@ describe("configuration loader utilities", () => {
       const placeholderToken = { var: "new_file_path" };
       const ruleIndex = 0;
       const tokenIndex = 1;
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.equal(
         convertCommandToken({
           rawToken: literalToken,
@@ -529,7 +529,7 @@ describe("configuration loader utilities", () => {
     it("rejects non-string, non-placeholder command tokens", () => {
       const ruleIndex = 1;
       const tokenIndex = 2;
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.equal(
         convertCommandToken({
           rawToken: true,
@@ -555,7 +555,7 @@ describe("configuration loader utilities", () => {
     const category = "new_file_editor";
     it("preserves token order in a valid command action", () => {
       const rawAction = ["code", "--wait", { var: "new_file_path" }];
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.deepEqual(
         convertCommandAction({
           rawAction,
@@ -570,7 +570,7 @@ describe("configuration loader utilities", () => {
     it("rejects a command action with an invalid token", () => {
       const ruleIndex = 1;
       const tokenIndex = 1;
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.equal(
         convertCommandAction({
           rawAction: ["code", true, "--wait"],
@@ -600,7 +600,7 @@ describe("configuration loader utilities", () => {
         "var:new_file_path": regexSource,
         action,
       };
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.deepEqual(
         convertRawRule({ category, rawRule, ruleIndex: 0, issues }),
         {
@@ -615,7 +615,7 @@ describe("configuration loader utilities", () => {
     it("returns no partial rule when fields are unsupported", () => {
       const ruleIndex = 1;
       const rawRule = { action: "prompt", event: "agent_settled" };
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.equal(
         convertRawRule({ category, rawRule, ruleIndex, issues }),
         undefined,
@@ -639,7 +639,7 @@ describe("configuration loader utilities", () => {
         { action: "deny", event: "agent_settled" },
         { action: "allow" },
       ];
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.deepEqual(
         convertHandlerCategoryRules({ category, rawRules, issues }),
         [
@@ -662,7 +662,7 @@ describe("configuration loader utilities", () => {
     it("converts supported categories and reports unknown categories", () => {
       const category = "new_file_editor";
       const unknownCategory = "unsupported_editor";
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.deepEqual(
         convertHandlerRules({
           rawHandlers: {
@@ -694,7 +694,7 @@ describe("configuration loader utilities", () => {
       },
     ];
     it("converts command-only rules for a supported hook", () => {
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.deepEqual(
         convertHookRules({
           rawHooks: { assistant_message_end: supportedHookRules },
@@ -707,7 +707,7 @@ describe("configuration loader utilities", () => {
 
     it("preserves supported hooks while reporting unknown hook names", () => {
       const unknownHookName = "tool_complete";
-      const issues: ConfigurationIssue[] = [];
+      const issues: Array<ConfigurationIssue> = [];
       assert.deepEqual(
         convertHookRules({
           rawHooks: {

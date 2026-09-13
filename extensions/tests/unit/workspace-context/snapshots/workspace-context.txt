@@ -1,0 +1,25 @@
+<teleprompt_commentary_workspace_context>
+
+File tools may access the primary workspace and explicitly configured additional workspaces without additional permission.
+File-tool calls targeting paths outside those workspaces may still be attempted; the extension will request interactive permission before execution. Do not treat outside paths as categorically forbidden.
+The bash tool is not workspace-gated. Use it only with paths inside the configured workspace boundaries.
+Do not issue parallel write or edit operations that target the same path.
+Context source contents below are a snapshot read before this agent run. Changes to those files apply on the next agent run.
+
+<workspace role="primary" path="/workspaces/primary" availability="available">
+Pi owns resource and instruction loading for this primary workspace.
+</workspace>
+
+<workspace role="additional" path="/workspaces/additional" availability="available">
+<workspace_system_prompt_append path="/workspaces/additional/.pi/APPEND_SYSTEM.md">
+Use the additional workspace terminology.
+
+</workspace_system_prompt_append>
+
+<workspace_instructions path="/workspaces/additional/AGENTS.md">
+Follow the additional workspace rules.
+
+</workspace_instructions>
+</workspace>
+
+</teleprompt_commentary_workspace_context>

@@ -25,10 +25,10 @@ type EditorRequest = {
 };
 
 type WiringObservations = {
-  notifications: Notification[];
-  editorRequests: EditorRequest[];
-  savedSources: string[];
-  processCommands: string[][];
+  notifications: Array<Notification>;
+  editorRequests: Array<EditorRequest>;
+  savedSources: Array<string>;
+  processCommands: Array<Array<string>>;
   configurationReadCount: number;
 };
 

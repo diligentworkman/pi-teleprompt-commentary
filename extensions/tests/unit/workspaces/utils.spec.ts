@@ -26,7 +26,7 @@ import {
 
 const entryTimestamp = "2026-01-01T00:00:00.000Z";
 
-function createWorkspaceBranch(snapshots: readonly unknown[]) {
+function createWorkspaceBranch(snapshots: ReadonlyArray<unknown>) {
   return snapshots.map((data, index) => {
     return {
       type: "custom",
@@ -53,7 +53,7 @@ function createFailingWorkspaceFileSystem(
     | { type: "realpath-fails"; error: Error }
     | { type: "stat-fails"; canonicalPath: string; error: Error },
 ) {
-  const metadataRequests: string[] = [];
+  const metadataRequests: Array<string> = [];
   const fileSystem = {
     async realpath() {
       if (scenario.type === "realpath-fails") {

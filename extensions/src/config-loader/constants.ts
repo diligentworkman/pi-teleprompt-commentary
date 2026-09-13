@@ -40,23 +40,23 @@ export const availableHandlerVariables = {
   diff_editor: ["old_content_file_path", "new_content_file_path"],
   new_file_editor: ["new_file_path"],
   command_editor: ["command_file_path", "command_string"],
-} as const satisfies Record<HandlerCategory, readonly VariableName[]>;
+} as const satisfies Record<HandlerCategory, ReadonlyArray<VariableName>>;
 
 export const availableHookVariables = {
   assistant_message_end: ["assistant_message_text"],
   tool_permission_request: ["tool_name"],
   agent_settled: [],
-} as const satisfies Record<HookName, readonly VariableName[]>;
+} as const satisfies Record<HookName, ReadonlyArray<VariableName>>;
 
 export const availableVariables = {
   ...availableHandlerVariables,
   ...availableHookVariables,
-} as const satisfies Record<RuleContext, readonly VariableName[]>;
+} as const satisfies Record<RuleContext, ReadonlyArray<VariableName>>;
 
 export const commandOnlyHandlerCategories = [
   "configuration_editor",
   "workspace_opener",
-] as const satisfies readonly HandlerCategory[];
+] as const satisfies ReadonlyArray<HandlerCategory>;
 
 export const commandOnlyCategories = new Set<RuleContext>([
   ...commandOnlyHandlerCategories,

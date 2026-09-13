@@ -65,7 +65,7 @@ class FakeTimeoutScheduler {
 
 type SpawnRequest = {
   executable: string;
-  args: string[];
+  args: Array<string>;
   options: SpawnOptions;
 };
 
@@ -102,7 +102,7 @@ function createProcessRunnerHarness(spawnError?: Error) {
 
   return {
     timeoutScheduler,
-    start(command: [string, ...string[]]) {
+    start(command: [string, ...Array<string>]) {
       const child = new FakeChildProcess();
       childForStart = child;
       const runningProcess = runner.start({ command });

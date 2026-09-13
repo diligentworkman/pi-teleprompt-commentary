@@ -1,3 +1,4 @@
+import { isErrorWithCode } from "#/errors/index.ts";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -19,12 +20,8 @@ export const configurationFileSystem: ConfigurationFileSystem = {
   },
 };
 
-export function isConfigurationFileAlreadyExistsError(error: unknown): boolean {
-  if (!(error instanceof Error) || !("code" in error)) {
-    return false;
-  }
-
-  return error.code === "EEXIST";
+export function isConfigurationFileAlreadyExistsError(error: unknown) {
+  return isErrorWithCode({ error, code: "EEXIST" });
 }
 
 export async function ensureConfigurationFile({

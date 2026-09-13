@@ -25,11 +25,11 @@ export type Placeholder = {
 
 export type CommandToken = string | Placeholder;
 
-export type Command = [string, ...CommandToken[]];
+export type Command = [string, ...Array<CommandToken>];
 
 export type Action = Decision | Command;
 
-export type ResolvedCommand = [executable: string, ...args: string[]];
+export type ResolvedCommand = [executable: string, ...args: Array<string>];
 
 export type ResolvedAction = Decision | ResolvedCommand;
 
@@ -72,8 +72,8 @@ export type HandlerRule = Rule;
 export type HookRule = Rule<Command>;
 
 export type TelepromptConfig = {
-  handlers: Partial<Record<HandlerCategory, HandlerRule[]>>;
-  hooks: Partial<Record<HookName, HookRule[]>>;
+  handlers: Partial<Record<HandlerCategory, Array<HandlerRule>>>;
+  hooks: Partial<Record<HookName, Array<HookRule>>>;
 };
 
 export type ConfigurationIssue = {
@@ -82,7 +82,7 @@ export type ConfigurationIssue = {
 
 export type ConfigurationConversionResult = {
   configuration: TelepromptConfig;
-  issues: ConfigurationIssue[];
+  issues: Array<ConfigurationIssue>;
 };
 
 export type ConfigurationLoaderDependencies = {

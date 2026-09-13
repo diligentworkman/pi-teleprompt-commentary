@@ -1,5 +1,6 @@
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { ConfigLoader } from "#/config-loader/index.ts";
+import { getErrorMessage } from "#/errors/index.ts";
 import type { ProcessRunner } from "#/process/index.ts";
 import { realpath, stat } from "node:fs/promises";
 import { workspaceEntryType } from "./constants.ts";
@@ -62,7 +63,7 @@ export async function openWorkspace({
     reportWarning(
       errorMessageTemplates.workspaceOpenFailed({
         workspacePath,
-        errorMessage: error instanceof Error ? error.message : String(error),
+        errorMessage: getErrorMessage(error),
       }),
     );
 
@@ -82,7 +83,7 @@ export async function openWorkspace({
     reportWarning(
       errorMessageTemplates.workspaceOpenFailed({
         workspacePath,
-        errorMessage: error instanceof Error ? error.message : String(error),
+        errorMessage: getErrorMessage(error),
       }),
     );
 
@@ -104,7 +105,7 @@ export async function openWorkspace({
   });
 }
 
-export function restoreWorkspaceSnapshot(entries: readonly SessionEntry[]) {
+export function restoreWorkspaceSnapshot(entries: ReadonlyArray<SessionEntry>) {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
     if (entry.type !== "custom" || entry.customType !== workspaceEntryType) {

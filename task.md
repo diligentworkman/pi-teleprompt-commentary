@@ -77,13 +77,13 @@ This checklist turns [`implementation_plan.md`](./implementation_plan.md) into s
 
 ## 5. Workspace Resources, Rules, and Agent Context
 
-- [ ] Discover existing `.pi/skills`, `.agents/skills`, and `.pi/prompts` directories for Pi.
-- [ ] For additional workspaces, load root instructions with `AGENTS.override.md` → `AGENTS.md` → `CLAUDE.md` precedence plus `.pi/APPEND_SYSTEM.md`, and reread them before each agent run (see `plan_modifications.md`).
-- [ ] Append attributed, concise workspace boundaries/rules and same-path mutation guidance to the system prompt.
-- [ ] Let Pi own primary-workspace instructions; never duplicate them or load workspace extensions, recursive rules, `.pi/SYSTEM.md`, or unsupported resources.
-- [ ] Test resource filtering/order, instruction precedence, primary-workspace exclusion, missing/read-failing files, reload, and generated system-prompt text.
-- [ ] Manually verify skill/prompt discovery and workspace rules in Pi.
-- [ ] Run typechecking and all tests.
+- [x] Discover existing `.pi/skills`, `.agents/skills`, and `.pi/prompts` directories for Pi, following deliberate symlinked resources transparently (see `plan_modifications.md`).
+- [x] For additional workspaces, load root instructions with `AGENTS.override.md` → `AGENTS.md` → `CLAUDE.md` precedence plus `.pi/APPEND_SYSTEM.md`, and reread them before each agent run (see `plan_modifications.md`).
+- [x] Append attributed, concise workspace boundaries/rules and same-path mutation guidance to the system prompt.
+- [x] Let Pi own primary-workspace instructions; never duplicate them or load workspace extensions, recursive rules, `.pi/SYSTEM.md`, or unsupported resources.
+- [x] Test resource filtering/order, instruction precedence, primary-workspace exclusion, missing/read-failing files, reload, and generated system-prompt text.
+- [x] Manually verify skill/prompt discovery and workspace rules in Pi.
+- [x] Run typechecking and all tests.
 
 **Review checkpoint:** Approve loaded resources and exact agent-facing context.
 
@@ -91,14 +91,14 @@ This checklist turns [`implementation_plan.md`](./implementation_plan.md) into s
 
 ## 6. Path Permission Gates
 
-- [ ] Implement Pi-compatible canonical path resolution and containment checks, including missing targets below symlinks.
-- [ ] Add typed path extractors for `read`, `write`, `edit`, `grep`, `find`, and `ls`.
-- [ ] Implement the one-call outside-primary-and-additional-workspaces Allow/Deny gate before file policy resolution.
-- [ ] Fail closed when the workspace gate requires unavailable UI.
-- [ ] Test descendants, parents, sibling prefixes, automatic primary-workspace permission, empty additional workspaces, symlinks, and future multi-path extraction.
-- [ ] Add extension wiring tests for every supported built-in path tool.
-- [ ] Manually verify inside/outside path calls in Pi.
-- [ ] Run typechecking and all tests.
+- [x] Implement Pi-compatible canonical path resolution and containment checks, including missing targets below symlinks.
+- [x] Add typed path extractors for `read`, `write`, `edit`, `grep`, `find`, and `ls`.
+- [x] Implement the one-call outside-primary-and-additional-workspaces Allow/Deny gate before file policy resolution.
+- [x] Fail closed when the workspace gate requires unavailable UI.
+- [x] Test descendants, parents, sibling prefixes, automatic primary-workspace permission, empty additional workspaces, symlinks, and future multi-path extraction.
+- [x] Add extension wiring tests for every supported built-in path tool.
+- [x] Manually verify inside/outside path calls in Pi.
+- [x] Run typechecking and all tests.
 
 **Review checkpoint:** Approve path semantics and the permission-gate UX.
 
@@ -176,23 +176,23 @@ This checklist turns [`implementation_plan.md`](./implementation_plan.md) into s
 
 ---
 
-## 12. Notifications
+## 12. Event Hooks
 
-- [ ] Implement best-effort notifier dispatch through normal last-match-wins rules.
-- [ ] Add `assistant_message_end`, `tool_permission_request`, and `agent_settled` with predictable extension-authored title/body values.
-- [ ] Fire permission notifications only for prompts/external review, not explicit allow/deny or normal no-op.
-- [ ] Ensure notifier failures never alter Pi behavior; do not add unnecessary content sanitization initially.
-- [ ] Test event filtering, precedence, placeholder expansion, suppression, fixed text, and swallowed failures.
-- [ ] Manually test configured desktop notifications.
+- [ ] Implement best-effort command dispatch through normal last-match-wins hook rules.
+- [ ] Add `assistant_message_end`, `tool_permission_request`, and `agent_settled` dispatch with their defined hook variables.
+- [ ] Fire `tool_permission_request` only for prompts/external review, not explicit allow/deny or normal no-op.
+- [ ] Ensure hook command failures never alter Pi behavior; do not add unnecessary content sanitization initially.
+- [ ] Test event filtering, precedence, placeholder expansion, suppression, fixed values, and swallowed failures.
+- [ ] Manually test configured hook commands, including a desktop-notification command if available.
 - [ ] Run typechecking and all tests.
 
-**Review checkpoint:** Approve notification timing, frequency, and wording.
+**Review checkpoint:** Approve hook timing, frequency, variables, and failure isolation.
 
 ---
 
 ## 13. Wiring, Manual Regression, and Failure Recovery
 
-- [ ] Complete fake-API wiring scenarios for config, workspaces, path gates, bash, files, notifications, reload, and shutdown.
+- [ ] Complete fake-API wiring scenarios for config, workspaces, path gates, bash, files, event hooks, reload, and shutdown.
 - [ ] Verify branch restoration, malformed config, missing programs, non-UI behavior, and all cleanup paths.
 - [ ] Check for leaked children, temporary files, file sessions, post-tool actions, and reservations.
 - [ ] Maintain a concise manual Pi checklist and convert discovered lifecycle behavior into focused automated regression tests.

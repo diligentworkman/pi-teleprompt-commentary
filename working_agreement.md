@@ -6,10 +6,12 @@
 - Record completed work by ticking only the applicable `task.md` checkboxes.
 - Record approved product/architecture deviations in `plan_modifications.md` and update the related task item in the same change.
 - The user performs manual Pi testing and runs verification commands. Do not run tests unless explicitly asked.
+- Perform every manual or ad hoc filesystem test entirely within a dedicated directory under the operating system temporary directory. All test workspaces, paths, files, and symlinks—including the primary workspace—must remain below that temporary root. Never create, modify, link, or delete test artifacts in the repository or any other non-temporary directory.
 
 ## Files and package management
 
 - Read every file targeted for a change immediately before editing it.
+- Use targeted edit/write tool calls for source changes. Do not use ad hoc scripts to edit files unless the user explicitly approves the script and its exact scope first.
 - Do not read, edit, or otherwise touch `package.json`, `pnpm-lock.yaml`, or pnpm workspace files.
 - Keep feature code within its `index.ts`, `schema.ts`, `types.ts`, and `utils.ts` files unless a separate module is clearly justified.
 - Use `describe`/`it` style for tests.
@@ -28,10 +30,11 @@
 ## Style
 
 - Prefer clear, descriptive names without making them unnecessarily long.
+- Use explicit function return types when they communicate domain outcomes, enforce invariants, or define dependency/API contracts independently of the implementation. Prefer inference for straightforward transformations, delegating wrappers, and small helpers with obvious results. Prefer an explicit contract over repeated casts or literal-preservation machinery. Decide by contract clarity, not merely public/private visibility or function complexity.
+- Use `Array<T>` for homogeneous array types and `ReadonlyArray<T>` for their readonly counterparts. Reserve bracket syntax for tuple types.
 - Use a direct parameter when a project-defined function accepts exactly one argument. Use a named parameter object when it accepts multiple arguments; framework callbacks and third-party APIs retain their required signatures.
 - Use block statements for `if`/control-flow bodies and functions. Avoid terse one-line arrow functions except when the user explicitly prefers one.
 - Preserve the user's established formatting. Ask before resolving ambiguous formatting choices.
-- Use blank lines sparingly. Separate top-level declarations and functions. Within a block, a blank line may precede a return when statements come before it. Do not insert blank lines merely to separate adjacent guards or sequential implementation phases.
 - Treat specs as executable documentation: they must read clearly from top to bottom, use deliberate behavioral grouping and names, hide incidental setup behind readable helpers, and avoid brittle or implementation-heavy assertions.
 - Name shared conceptual test values once at their nearest common scope. Avoid repeated literals, setup, and expected values within one spec when they represent the same concept; duplication across specs or features is acceptable when their test dynamics differ.
 - Keep test machinery local to its spec file, generally as module-level helpers outside `describe`/`it`. Helpers may arrange inputs, dependencies, fakes, and captured outputs, but must not contain assertions; every assertion remains visible in its `it` block. Do not build shared cross-spec fixture, harness, or fake frameworks; tests may repeat boundary setup to remain independent and purpose-specific.

@@ -15,7 +15,7 @@ export type ConfigEditOutcome =
 export type ConfigEditorDependencies = {
   ensureConfigurationFile(): Promise<EnsuredConfigurationFile>;
   resolveConfigurationEditor(): Promise<
-    [executable: string, ...args: string[]] | undefined
+    [executable: string, ...args: Array<string>] | undefined
   >;
   processRunner: ProcessRunner;
   reportConfiguredEditorFailure(completion: ProcessCompletion): void;

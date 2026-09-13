@@ -30,7 +30,7 @@
   },
   "scripts": {
     "test": "pnpm run test:unit && pnpm run test:wiring",
-    "test:manual": "pi -e .",
+    "test:manual": "bash ./manual-test.sh",
     "test:unit": "node --test extensions/tests/unit/**/*.ts",
     "test:wiring": "node --test extensions/tests/wiring/**/*.ts",
     "typecheck": "tsc",

@@ -5,7 +5,7 @@ import { createConfigLoader } from "#/config-loader/index.ts";
 function createConfigLoaderHarness(
   readConfigurationFile: () => Promise<string>,
 ) {
-  const warnings: string[] = [];
+  const warnings: Array<string> = [];
   const loader = createConfigLoader({
     readConfigurationFile,
     reportConfigurationWarning(message) {

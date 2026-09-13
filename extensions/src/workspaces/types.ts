@@ -5,7 +5,7 @@ export type WorkspaceFileSystem = {
 
 export type WorkspaceState = {
   primaryWorkspace: string;
-  additionalWorkspaces: readonly string[];
+  additionalWorkspaces: ReadonlyArray<string>;
 };
 
 export type WorkspaceListView = {
@@ -13,7 +13,7 @@ export type WorkspaceListView = {
     path: string;
     availability: "available" | "unavailable";
   };
-  additionalWorkspaces: readonly string[];
+  additionalWorkspaces: ReadonlyArray<string>;
 };
 
 export type WorkspaceAddOutcome = {

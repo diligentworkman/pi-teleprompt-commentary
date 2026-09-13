@@ -22,8 +22,22 @@ import {
   createConfigLoader,
   resolveConfigPath,
 } from "#/config-loader/index.ts";
-import { resolveInputPath } from "#/paths/index.ts";
+import { getErrorMessage } from "#/errors/index.ts";
+import {
+  assessWorkspacePaths,
+  requestWorkspacePathPermission,
+} from "#/path-permissions/index.ts";
+import { extractToolPaths, resolveInputPath } from "#/paths/index.ts";
 import { createProcessRunner, type ProcessRunner } from "#/process/index.ts";
+import {
+  formatWorkspaceContext,
+  readWorkspaceContextSources,
+  selectWorkspaceContextSources,
+  type WorkspaceContextSource,
+  type WorkspaceContextSourceSelection,
+  type WorkspaceContextStatus,
+} from "#/workspace-context/index.ts";
+import { discoverWorkspaceResources } from "#/workspace-resources/index.ts";
 import {
   addWorkspace,
   commands as workspaceCommands,
@@ -85,7 +99,7 @@ export function registerTelepromptCommentary({
   pi: ExtensionAPI;
   dependencies: TelepromptCommentaryDependencies;
 }): void {
-  let additionalWorkspaces: readonly string[] = [];
+  let additionalWorkspaces: ReadonlyArray<string> = [];
   const createLoader = (
     reportConfigurationWarning: (message: string) => void,
   ) => {
@@ -107,8 +121,7 @@ export function registerTelepromptCommentary({
         ctx.ui.notify(
           workspaceWarningMessageTemplates.primaryWorkspaceUnavailable({
             workspacePath: ctx.cwd,
-            errorMessage:
-              error instanceof Error ? error.message : String(error),
+            errorMessage: getErrorMessage(error),
           }),
           "warning",
         );
@@ -138,6 +151,108 @@ export function registerTelepromptCommentary({
     additionalWorkspaces = restoreWorkspaceSnapshot(
       ctx.sessionManager.getBranch(),
     ).additionalWorkspaces;
+  });
+  pi.on("tool_call", async (event, ctx) => {
+    const requestedPaths = extractToolPaths({ event, cwd: ctx.cwd });
+    if (requestedPaths.length === 0) {
+      return;
+    }
+    const assessment = await assessWorkspacePaths({
+      requestedPaths,
+      workspacePaths: [ctx.cwd, ...additionalWorkspaces],
+      cwd: ctx.cwd,
+      homeDirectory: homedir(),
+    });
+    const permission = await requestWorkspacePathPermission({
+      input: {
+        assessment,
+        toolName: event.toolName,
+        hasUI: ctx.hasUI,
+      },
+      dependencies: {
+        async runPermissionRequestHook(toolName) {
+          const configLoader = createLoader((message) => {
+            if (ctx.hasUI) {
+              ctx.ui.notify(message, "warning");
+            }
+          });
+          const command = await configLoader.resolveHook({
+            hook: "tool_permission_request",
+            variables: { tool_name: toolName },
+          });
+          if (command !== undefined) {
+            dependencies.processRunner.start({ command });
+          }
+        },
+        confirmOutsideWorkspaceAccess({ title, message }) {
+          return ctx.ui.confirm(title, message);
+        },
+      },
+    });
+    if (permission.type === "blocked") {
+      return { block: true, reason: permission.reason };
+    }
+  });
+  pi.on("resources_discover", async (_event, ctx) => {
+    return discoverWorkspaceResources({
+      additionalWorkspaces,
+      reportWarning(message) {
+        if (ctx.hasUI) {
+          ctx.ui.notify(message, "warning");
+        }
+      },
+    });
+  });
+  pi.on("before_agent_start", async (event, ctx) => {
+    const reportWarning = (message: string) => {
+      if (ctx.hasUI) {
+        ctx.ui.notify(message, "warning");
+      }
+    };
+    let primaryWorkspaceStatus: WorkspaceContextStatus;
+    try {
+      primaryWorkspaceStatus = {
+        workspacePath: await resolveWorkspaceDirectory({
+          workspacePath: ctx.cwd,
+        }),
+        availability: "available",
+      };
+    } catch (error) {
+      const reason = getErrorMessage(error);
+      primaryWorkspaceStatus = {
+        workspacePath: ctx.cwd,
+        availability: "unavailable",
+        reason,
+      };
+      reportWarning(
+        workspaceWarningMessageTemplates.primaryWorkspaceUnavailable({
+          workspacePath: ctx.cwd,
+          errorMessage: reason,
+        }),
+      );
+    }
+    const additionalWorkspaceSelections: Array<WorkspaceContextSourceSelection> = [];
+    const contextSources: Array<WorkspaceContextSource> = [];
+    for (const workspacePath of additionalWorkspaces) {
+      const sourceSelection = await selectWorkspaceContextSources({
+        workspacePath,
+        reportWarning,
+      });
+      additionalWorkspaceSelections.push(sourceSelection);
+      contextSources.push(
+        ...(await readWorkspaceContextSources({
+          sourceSelection,
+          reportWarning,
+        })),
+      );
+    }
+    const workspaceContext = formatWorkspaceContext({
+      primaryWorkspaceStatus,
+      additionalWorkspaceSelections,
+      contextSources,
+    });
+
+    return { systemPrompt: `${event.systemPrompt}\n\n${workspaceContext}` };
   });
   pi.registerCommand(configEditorCommands.edit.name, {
     description: configEditorCommands.edit.description,
@@ -236,7 +351,7 @@ export function registerTelepromptCommentary({
         if (ctx.hasUI) {
           ctx.ui.notify(
             workspaceErrorMessageTemplates.workspaceAddFailed(
-              error instanceof Error ? error.message : String(error),
+              getErrorMessage(error),
             ),
             "warning",
           );
@@ -278,7 +393,7 @@ export function registerTelepromptCommentary({
         if (ctx.hasUI) {
           ctx.ui.notify(
             workspaceErrorMessageTemplates.workspaceAddFailed(
-              error instanceof Error ? error.message : String(error),
+              getErrorMessage(error),
             ),
             "warning",
           );
@@ -323,7 +438,7 @@ export function registerTelepromptCommentary({
         if (ctx.hasUI) {
           ctx.ui.notify(
             workspaceErrorMessageTemplates.workspaceRemoveFailed(
-              error instanceof Error ? error.message : String(error),
+              getErrorMessage(error),
             ),
             "warning",
           );
@@ -375,7 +490,7 @@ export function registerTelepromptCommentary({
         if (ctx.hasUI) {
           ctx.ui.notify(
             workspaceErrorMessageTemplates.workspaceRemoveFailed(
-              error instanceof Error ? error.message : String(error),
+              getErrorMessage(error),
             ),
             "warning",
           );
@@ -503,8 +618,7 @@ export function registerTelepromptCommentary({
         ctx.ui.notify(
           workspaceWarningMessageTemplates.primaryWorkspaceUnavailable({
             workspacePath: ctx.cwd,
-            errorMessage:
-              error instanceof Error ? error.message : String(error),
+            errorMessage: getErrorMessage(error),
           }),
           "warning",
         );

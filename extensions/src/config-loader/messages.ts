@@ -161,4 +161,4 @@ export const errorMessageTemplates = {
   ruleConditionMatchingNotImplemented() {
     return "Rule condition matching is not implemented yet.";
   },
-} satisfies Record<string, (...args: any[]) => string>;
+} satisfies Record<string, (...args: Array<any>) => string>;
