@@ -4,11 +4,10 @@ import type {
   ToolCallEvent,
 } from "@earendil-works/pi-coding-agent";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
-import { attempt, getErrorMessage } from "#/errors/index.ts";
 import { registerTelepromptCommentary } from "#/index.ts";
 import {
   blockReasonMessages,
@@ -129,6 +128,12 @@ function createPathPermissionHarness({
           observedConfirmations.push({ title, message });
           return confirmResult;
         },
+        async select() {
+          return "Accept";
+        },
+        async input() {
+          return undefined;
+        },
       },
     };
   }
@@ -170,6 +175,30 @@ function createPathPermissionHarness({
 }
 
 describe("path permission wiring", () => {
+  it("prompts for a read fallback symlink outside the workspace and blocks when permission is denied", async (testContext) => {
+    const root = await createTemporaryDirectory(testContext);
+    const cwd = join(root, "workspace");
+    await mkdir(cwd);
+    const outsidePath = join(root, "outside.txt");
+    await writeFile(outsidePath, "outside content");
+    await symlink(outsidePath, join(cwd, "report\u2019s.txt"));
+    const harness = createPathPermissionHarness({ confirmResult: false });
+    await harness.restore({ cwd });
+    const outcome = await harness.toolCall({
+      cwd,
+      event: {
+        type: "tool_call",
+        toolCallId: "outside-read-fallback",
+        toolName: "read",
+        input: { path: "report's.txt" },
+      },
+    });
+    assert.deepEqual(outcome, { block: true, reason: blockReasonMessages.permissionNotGranted });
+    assert.deepEqual(harness.observedConfirmations, [{
+      title: permissionPromptMessages.title,
+      message: permissionPromptMessages.body({ toolName: "read", outsidePaths: [outsidePath] }),
+    }]);
+  });
   it("automatically permits every supported path tool inside primary or additional workspaces", async (testContext) => {
     const cwd = await createTemporaryDirectory(testContext);
     const additionalWorkspace = join(cwd, "additional");
@@ -317,11 +346,6 @@ describe("path permission wiring", () => {
     const loopPath = join(cwd, "loop");
     const unresolvedPath = join(loopPath, "file.txt");
     await symlink("loop", loopPath);
-    const expectedResolution = await attempt(() => realpath(unresolvedPath));
-    assert.equal(expectedResolution.success, false);
-    if (expectedResolution.success) {
-      assert.fail("Expected the symlink loop to prevent canonical resolution.");
-    }
     const harness = createPathPermissionHarness({
       configurationSource: [
         "[[hooks.tool_permission_request]]",
@@ -332,24 +356,30 @@ describe("path permission wiring", () => {
       ],
     });
     await harness.restore({ cwd });
-    assert.deepEqual(
-      await harness.toolCall({
-        cwd,
-        event: {
-          type: "tool_call",
-          toolCallId: "unresolved-read",
-          toolName: "read",
-          input: { path: unresolvedPath },
-        },
-      }),
-      {
-        block: true,
-        reason: errorMessageTemplates.resolutionFailed({
-          path: unresolvedPath,
-          errorMessage: getErrorMessage(expectedResolution.error),
-        }),
+    const result = await harness.toolCall({
+      cwd,
+      event: {
+        type: "tool_call",
+        toolCallId: "unresolved-read",
+        toolName: "read",
+        input: { path: unresolvedPath },
       },
+    });
+    assert.ok(result && typeof result === "object");
+    assert.ok("block" in result);
+    assert.equal(result.block, true);
+    assert.ok("reason" in result);
+    assert.ok(typeof result.reason === "string");
+    assert.equal(
+      result.reason.startsWith(
+        errorMessageTemplates.resolutionFailed({
+          path: unresolvedPath,
+          errorMessage: "",
+        }),
+      ),
+      true,
     );
+    assert.match(result.reason, /\bELOOP\b/);
     assert.deepEqual(harness.processCommands, []);
     assert.deepEqual(harness.observedConfirmations, []);
   });

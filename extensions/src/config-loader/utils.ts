@@ -1,4 +1,4 @@
-import { getErrorMessage, isErrorWithCode } from "#/errors/index.ts";
+import { attempt, getErrorMessage, isErrorWithCode } from "#/errors/index.ts";
 import { join } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { z } from "zod";
@@ -72,21 +72,26 @@ export async function loadConfiguration(
       return createEmptyConfiguration();
     }
     const errorMessage = getErrorMessage(error);
-    dependencies.reportConfigurationWarning(
-      errorMessageTemplates.configurationFileReadFailed(errorMessage),
-    );
+    attempt.sync(() => {
+      dependencies.reportConfigurationWarning(
+        errorMessageTemplates.configurationFileReadFailed(errorMessage),
+      );
+    });
 
     return createEmptyConfiguration();
   }
   const conversionResult = parseConfigurationSource(configurationSource);
   if (conversionResult.issues.length > 0) {
-    dependencies.reportConfigurationWarning(
-      conversionResult.issues
-        .map((issue) => {
-          return issue.message;
-        })
-        .join("\n"),
-    );
+    attempt.sync(() => {
+      dependencies.reportConfigurationWarning(
+        conversionResult.issues
+          .map((issue) => {
+            return issue.message;
+          })
+          .join("\n"),
+      );
+    });
+
     return createEmptyConfiguration();
   }
 

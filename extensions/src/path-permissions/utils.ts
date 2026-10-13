@@ -1,7 +1,9 @@
+import { attempt } from "#/errors/index.ts";
 import {
   isPathWithinWorkspace,
   resolveCanonicalPath,
   resolveInputPath,
+  resolveReadCandidate,
 } from "#/paths/index.ts";
 import type {
   WorkspacePathAssessment,
@@ -11,15 +13,15 @@ import type {
 
 export async function assessWorkspacePaths({
   requestedPaths,
+  toolName,
   workspacePaths,
   cwd,
   homeDirectory,
 }: WorkspacePathAssessmentInput): Promise<WorkspacePathAssessment> {
   const canonicalWorkspacePaths: Array<string> = [];
   for (const workspacePath of workspacePaths) {
-    const resolution = await resolveCanonicalPath(
-      resolveInputPath({ inputPath: workspacePath, cwd, homeDirectory }),
-    );
+    // Workspace roots are resolved filesystem paths, not Pi tool inputs.
+    const resolution = await resolveCanonicalPath(workspacePath);
     if (!resolution.success) {
       return {
         type: "resolution-failed",
@@ -31,9 +33,10 @@ export async function assessWorkspacePaths({
   }
   const canonicalPaths: Array<string> = [];
   for (const requestedPath of requestedPaths) {
-    const resolution = await resolveCanonicalPath(
-      resolveInputPath({ inputPath: requestedPath, cwd, homeDirectory }),
-    );
+    const normalized = attempt.sync(() => resolveInputPath({ inputPath: requestedPath, cwd, homeDirectory }));
+    const resolution = normalized.success
+      ? await resolveCanonicalPath(toolName === "read" ? await resolveReadCandidate(normalized.value) : normalized.value)
+      : normalized;
     if (!resolution.success) {
       return {
         type: "resolution-failed",

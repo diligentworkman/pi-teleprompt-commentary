@@ -1,5 +1,6 @@
 export type WorkspacePathAssessmentInput = {
   requestedPaths: ReadonlyArray<string>;
+  toolName?: string;
   workspacePaths: ReadonlyArray<string>;
   cwd: string;
   homeDirectory: string;

@@ -23,6 +23,9 @@ export const infoMessageTemplates = {
 };
 
 export const warningMessageTemplates = {
+  workspaceStateChanged() {
+    return "Workspace state changed while this command was waiting; retry the command.";
+  },
   workspacesOpenDoesNotAcceptArguments() {
     return "/tc:workspaces-open does not accept arguments.";
   },

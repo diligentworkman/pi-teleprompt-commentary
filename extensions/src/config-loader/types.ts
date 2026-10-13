@@ -99,11 +99,8 @@ export type ConfigLoader = {
     category: TCategory;
     variables: VariablesFor<TCategory>;
   }): Promise<ResolvedHandlerAction<TCategory> | undefined>;
-  resolveHook<THook extends HookName>({
-    hook,
-    variables,
-  }: {
+  resolveHooks<THook extends HookName>(input: {
     hook: THook;
     variables: VariablesFor<THook>;
-  }): Promise<ResolvedCommand | undefined>;
+  }): Promise<Array<ResolvedCommand>>;
 };

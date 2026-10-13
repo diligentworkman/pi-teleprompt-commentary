@@ -37,6 +37,7 @@ export function createConfigEditor(
   dependencies: ConfigEditorDependencies,
 ): ConfigEditor {
   const {
+    isShuttingDown,
     ensureConfigurationFile,
     resolveConfigurationEditor,
     processRunner,
@@ -46,7 +47,10 @@ export function createConfigEditor(
     saveConfiguration,
     revalidateConfiguration,
   } = dependencies;
-  async function finish(outcome: ConfigEditOutcome) {
+  async function finish(outcome: ConfigEditOutcome): Promise<ConfigEditOutcome> {
+    if (isShuttingDown?.()) {
+      return { type: "shutdown" };
+    }
     await revalidateConfiguration();
 
     return outcome;
@@ -54,13 +58,25 @@ export function createConfigEditor(
 
   return {
     async edit() {
+      if (isShuttingDown?.()) {
+        return { type: "shutdown" };
+      }
       let { source } = await ensureConfigurationFile();
+      if (isShuttingDown?.()) {
+        return { type: "shutdown" };
+      }
       const configuredEditor = await resolveConfigurationEditor();
+      // Resolution may finish after the runtime has cleaned up its children.
+      if (isShuttingDown?.()) {
+        return { type: "shutdown" };
+      }
       if (configuredEditor !== undefined) {
         const completion = await processRunner.start({
           command: configuredEditor,
         }).completion;
-
+        if (isShuttingDown?.()) {
+          return { type: "shutdown" };
+        }
         const exitedCleanly =
           completion.type === "exited" &&
           completion.exitCode === 0 &&
@@ -71,10 +87,16 @@ export function createConfigEditor(
         reportConfiguredEditorFailure(completion);
         source = await readConfigurationFile();
       }
+      if (isShuttingDown?.()) {
+        return { type: "shutdown" };
+      }
       if (openPiEditor === undefined) {
         return finish({ type: "editor-unavailable" });
       }
       const editedSource = await openPiEditor(source);
+      if (isShuttingDown?.()) {
+        return { type: "shutdown" };
+      }
       if (editedSource === undefined) {
         return finish({ type: "pi-editor-cancelled" });
       }

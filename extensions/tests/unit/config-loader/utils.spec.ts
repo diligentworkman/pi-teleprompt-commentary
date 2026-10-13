@@ -864,6 +864,41 @@ describe("configuration loader utilities", () => {
         errorMessageTemplates.configurationFileReadFailed(readError.message),
       ]);
     });
+    it("retains empty fallback and retries the current warning on every read failure even when the reporter throws", async () => {
+      const readError = new Error("permission denied");
+      const { dependencies, warnings } = createLoadConfigurationHarness(async () => {
+        throw readError;
+      });
+      dependencies.reportConfigurationWarning = (message: string) => {
+        warnings.push(message);
+        throw new Error("warning reporter failed");
+      };
+      assert.deepEqual(await loadConfiguration(dependencies), createEmptyConfiguration());
+      assert.deepEqual(await loadConfiguration(dependencies), createEmptyConfiguration());
+      const expectedWarning = errorMessageTemplates.configurationFileReadFailed(readError.message);
+      assert.deepEqual(warnings, [expectedWarning, expectedWarning]);
+    });
+    for (const { condition, source } of [
+      { condition: "malformed TOML", source: "handlers = [" },
+      { condition: "invalid schema", source: 'handlers = "invalid"' },
+      { condition: "invalid regex", source: '[[handlers.new_file_editor]]\n"var:new_file_path" = "["\naction = "prompt"' },
+    ]) {
+      it(`retains empty fallback and retries the current warning for ${condition} even when the reporter throws`, async () => {
+        const { dependencies, warnings } = createLoadConfigurationHarness(async () => {
+          return source;
+        });
+        dependencies.reportConfigurationWarning = (message: string) => {
+          warnings.push(message);
+          throw new Error("warning reporter failed");
+        };
+        assert.deepEqual(await loadConfiguration(dependencies), createEmptyConfiguration());
+        assert.deepEqual(await loadConfiguration(dependencies), createEmptyConfiguration());
+        const expectedWarning = parseConfigurationSource(source).issues.map((issue) => {
+          return issue.message;
+        }).join("\n");
+        assert.deepEqual(warnings, [expectedWarning, expectedWarning]);
+      });
+    }
     it("reports current invalid-source warnings on every load", async () => {
       const invalidConfigurationSource = "handlers = [";
       const expectedWarning = parseConfigurationSource(

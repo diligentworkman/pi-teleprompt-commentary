@@ -22,10 +22,38 @@ async function runAttempt<T>(
   }
 }
 
+function runSynchronousAttempt<T>(operation: () => T): AttemptResult<T> {
+  try {
+    return attemptValue(operation());
+  } catch (error) {
+    return attemptError(error);
+  }
+}
+
 export const attempt = Object.assign(runAttempt, {
   value: attemptValue,
   error: attemptError,
+  sync: runSynchronousAttempt,
 });
+
+export async function attemptWithCleanup<T>({
+  operation,
+  cleanup,
+}: {
+  operation(): Promise<T>;
+  cleanup(): Promise<void>;
+}): Promise<AttemptResult<T>> {
+  const operationAttempt = await attempt(operation);
+  const cleanupAttempt = await attempt(cleanup);
+  if (!operationAttempt.success) {
+    return operationAttempt;
+  }
+  if (!cleanupAttempt.success) {
+    return cleanupAttempt;
+  }
+
+  return operationAttempt;
+}
 
 export function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);

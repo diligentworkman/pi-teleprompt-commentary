@@ -107,7 +107,7 @@ describe("workspace path permission", () => {
       reason: blockReasonMessages.permissionNotGranted,
     });
   });
-  it("fails closed without UI after emitting the permission request", async () => {
+  it("fails closed without UI without emitting a permission hook", async () => {
     const interaction = createInteraction(true);
     const outcome = await requestWorkspacePathPermission({
       input: {
@@ -125,7 +125,7 @@ describe("workspace path permission", () => {
       type: "blocked",
       reason: blockReasonMessages.uiUnavailable,
     });
-    assert.deepEqual(interaction.emittedToolNames, [toolName]);
+    assert.deepEqual(interaction.emittedToolNames, []);
     assert.deepEqual(interaction.decisionRequests, []);
   });
   it("continues to the permission decision when the hook fails", async () => {

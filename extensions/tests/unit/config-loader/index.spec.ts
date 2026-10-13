@@ -17,6 +17,38 @@ function createConfigLoaderHarness(
 }
 
 describe("configuration loader", () => {
+  it("resolves all matching hooks in declaration order with direct-argv placeholder expansion", async () => {
+    const { loader, warnings } = createConfigLoaderHarness(async () => `
+[[hooks.assistant_message_end]]
+action = ["first", { var = "assistant_message_text", prepend = "<", append = ">" }]
+[[hooks.assistant_message_end]]
+"var:assistant_message_text" = '^unmatched$'
+action = ["skip"]
+[[hooks.assistant_message_end]]
+"var:assistant_message_text" = '^Finished'
+action = ["second", "fixed argument"]
+`);
+    assert.deepEqual(await loader.resolveHooks({
+      hook: "assistant_message_end",
+      variables: { assistant_message_text: "Finished with spaces\nand newline" },
+    }), [["first", "<Finished with spaces\nand newline>"], ["second", "fixed argument"]]);
+    assert.deepEqual(warnings, []);
+  });
+
+  it("returns no hooks for an unmatched category and keeps handler precedence unchanged", async () => {
+    const { loader } = createConfigLoaderHarness(async () => `
+[[handlers.new_file_editor]]
+action = "allow"
+[[handlers.new_file_editor]]
+action = "deny"
+[[hooks.tool_permission_request]]
+"var:tool_name" = '^edit$'
+action = ["notify"]
+`);
+    assert.deepEqual(await loader.resolveHooks({ hook: "agent_settled", variables: {} }), []);
+    assert.deepEqual(await loader.resolveHooks({ hook: "tool_permission_request", variables: { tool_name: "write" } }), []);
+    assert.equal(await loader.resolveHandler({ category: "new_file_editor", variables: { new_file_path: "/file" } }), "deny");
+  });
   it("rereads the current configuration source on every load", async () => {
     let configurationSource = [
       "[[handlers.new_file_editor]]",
@@ -71,11 +103,11 @@ describe("configuration loader", () => {
       return configurationSource;
     });
     assert.deepEqual(
-      await loader.resolveHook({
+      await loader.resolveHooks({
         hook: "assistant_message_end",
         variables,
       }),
-      ["notify-send", "Finished"],
+      [["notify-send", "Finished"]],
     );
     assert.deepEqual(warnings, []);
   });

@@ -1,6 +1,6 @@
-import { isErrorWithCode } from "#/errors/index.ts";
+import { attempt, isErrorWithCode } from "#/errors/index.ts";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { starterConfigurationReferenceUrl } from "./constants.ts";
 import type {
@@ -56,24 +56,24 @@ export async function ensureConfigurationFile({
 export async function writeConfigurationFileAtomically({
   configFilePath,
   source,
+  createFileId = randomUUID,
 }: {
   configFilePath: string;
   source: string;
+  createFileId?(): string;
 }): Promise<void> {
-  const temporaryFilePath = `${configFilePath}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temporaryFilePath, source, {
-      encoding: "utf8",
-      flag: "wx",
-    });
-    await rename(temporaryFilePath, configFilePath);
-  } catch (error) {
-    try {
-      await rm(temporaryFilePath, { force: true });
-    } catch {
-      // Preserve the original write failure when best-effort cleanup also fails.
-    }
-    throw error;
+  const temporaryFilePath = `${configFilePath}.${createFileId()}.tmp`;
+  // Failed exclusive opening grants no ownership and must not trigger removal.
+  const handle = await open(temporaryFilePath, "wx");
+  const writeAttempt = await attempt(() => handle.writeFile(source, "utf8"));
+  const closeAttempt = await attempt(() => handle.close());
+  const preparation = writeAttempt.success ? closeAttempt : writeAttempt;
+  const replacement = preparation.success
+    ? await attempt(() => rename(temporaryFilePath, configFilePath))
+    : preparation;
+  if (!replacement.success) {
+    await attempt(() => rm(temporaryFilePath, { force: true }));
+    throw replacement.error;
   }
 }
 

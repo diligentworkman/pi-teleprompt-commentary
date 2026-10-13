@@ -34,10 +34,10 @@ export async function requestWorkspacePathPermission({
       }),
     };
   }
-  await attempt(() => runPermissionRequestHook(toolName));
   if (!hasUI) {
     return { type: "blocked", reason: blockReasonMessages.uiUnavailable };
   }
+  await attempt(() => runPermissionRequestHook(toolName));
   const allowed = await confirmOutsideWorkspaceAccess({
     title: permissionPromptMessages.title,
     message: permissionPromptMessages.body({

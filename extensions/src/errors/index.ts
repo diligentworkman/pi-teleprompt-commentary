@@ -1,2 +1,2 @@
 export type { AttemptResult } from "./types.ts";
-export { attempt, getErrorMessage, isErrorWithCode, toError } from "./utils.ts";
+export { attempt, attemptWithCleanup, getErrorMessage, isErrorWithCode, toError } from "./utils.ts";

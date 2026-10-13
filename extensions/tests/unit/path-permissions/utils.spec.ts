@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, it } from "node:test";
 import {
   assessWorkspacePaths,
@@ -40,6 +43,56 @@ describe("path permission utilities", () => {
         }),
         { type: "inside", canonicalPaths: [canonicalPath] },
       );
+    });
+    for (const workspaceKind of ["primary", "additional"] as const) {
+      it(`preserves a Unicode-space ${workspaceKind} workspace without permitting its ordinary-space sibling`, async (testContext) => {
+        const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), "teleprompt-workspace-identity-")));
+        testContext.after(async () => {
+          await rm(temporaryRoot, { recursive: true, force: true });
+        });
+        const literalWorkspace = join(temporaryRoot, "my\u00A0project");
+        const siblingWorkspace = join(temporaryRoot, "my project");
+        await mkdir(literalWorkspace);
+        await mkdir(siblingWorkspace);
+        const literalFile = join(literalWorkspace, "file.txt");
+        const siblingFile = join(siblingWorkspace, "file.txt");
+        await writeFile(literalFile, "permitted");
+        await writeFile(siblingFile, "outside");
+        const currentDirectory = workspaceKind === "primary" ? literalWorkspace : temporaryRoot;
+        const inside = await assessWorkspacePaths({
+          requestedPaths: [workspaceKind === "primary" ? "file.txt" : pathToFileURL(literalFile).href],
+          workspacePaths: [literalWorkspace],
+          cwd: currentDirectory,
+          homeDirectory: temporaryRoot,
+        });
+        assert.deepEqual(inside, { type: "inside", canonicalPaths: [literalFile] });
+        const outside = await assessWorkspacePaths({
+          requestedPaths: [siblingFile],
+          workspacePaths: [literalWorkspace],
+          cwd: currentDirectory,
+          homeDirectory: temporaryRoot,
+        });
+        assert.deepEqual(outside, {
+          type: "outside",
+          canonicalPaths: [siblingFile],
+          outsidePaths: [siblingFile],
+        });
+      });
+    }
+    it("returns a typed failure for a malformed requested file URL", async () => {
+      const path = "file:///%ZZ";
+      const assessment = await assessWorkspacePaths({
+        requestedPaths: [path],
+        workspacePaths: [cwd],
+        cwd,
+        homeDirectory,
+      });
+      assert.equal(assessment.type, "resolution-failed");
+      if (assessment.type !== "resolution-failed") {
+        assert.fail("Expected a typed normalization failure");
+      }
+      assert.equal(assessment.path, path);
+      assert.ok(assessment.error instanceof URIError);
     });
     it("attributes an explicit failure to the path that could not be resolved", async () => {
       const path = "\0";

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
@@ -142,6 +142,57 @@ describe("configuration editor utilities", () => {
     });
   });
   describe("writeConfigurationFileAtomically", () => {
+    const temporaryFileId = "controlled-save";
+    const existingSource = "existing configuration";
+    it("preserves both the configuration and an unowned temporary file when exclusive creation collides", async (testContext) => {
+      const temporaryDirectory = await createTemporaryDirectory(testContext);
+      const configFilePath = join(temporaryDirectory, configFileName);
+      const temporaryFilePath = `${configFilePath}.${temporaryFileId}.tmp`;
+      const unownedSource = "another operation's content";
+      await writeFile(configFilePath, existingSource);
+      await writeFile(temporaryFilePath, unownedSource);
+      await assert.rejects(writeConfigurationFileAtomically({
+        configFilePath,
+        source: "replacement",
+        createFileId() {
+          return temporaryFileId;
+        },
+      }), { code: "EEXIST" });
+      assert.equal(await readFile(configFilePath, "utf8"), existingSource);
+      assert.equal(await readFile(temporaryFilePath, "utf8"), unownedSource);
+      assert.deepEqual((await readdir(temporaryDirectory)).sort(), [configFileName, `${configFileName}.${temporaryFileId}.tmp`].sort());
+    });
+    it("closes and removes its owned temporary file after writing fails without changing the configuration", async (testContext) => {
+      const temporaryDirectory = await createTemporaryDirectory(testContext);
+      const configFilePath = join(temporaryDirectory, configFileName);
+      await writeFile(configFilePath, existingSource);
+      await assert.rejects(writeConfigurationFileAtomically({
+        configFilePath,
+        source: null as unknown as string,
+        createFileId() {
+          return temporaryFileId;
+        },
+      }), TypeError);
+      assert.equal(await readFile(configFilePath, "utf8"), existingSource);
+      assert.deepEqual(await readdir(temporaryDirectory), [configFileName]);
+    });
+    it("removes its owned temporary file after rename fails without changing the existing destination", async (testContext) => {
+      const temporaryDirectory = await createTemporaryDirectory(testContext);
+      const configFilePath = join(temporaryDirectory, configFileName);
+      await mkdir(configFilePath);
+      const markerFilePath = join(configFilePath, "preserved.txt");
+      await writeFile(markerFilePath, existingSource);
+      await assert.rejects(writeConfigurationFileAtomically({
+        configFilePath,
+        source: "replacement",
+        createFileId() {
+          return temporaryFileId;
+        },
+      }));
+      assert.equal(await readFile(markerFilePath, "utf8"), existingSource);
+      assert.deepEqual(await readdir(configFilePath), ["preserved.txt"]);
+      assert.deepEqual(await readdir(temporaryDirectory), [configFileName]);
+    });
     it("replaces the existing configuration without leaving a temporary file", async (testContext) => {
       const temporaryDirectory = await createTemporaryDirectory(testContext);
       const configFilePath = join(temporaryDirectory, configFileName);

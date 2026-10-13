@@ -52,21 +52,37 @@ function createPendingProcessCompletion() {
   };
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => {
+    resolve = complete;
+  });
+
+  return { promise, resolve };
+}
+
 function createConfigEditorWiringHarness({
   configurationSource = "",
   starterSource = "",
   piEditorResult,
   processCompletion,
+  readConfigurationSource,
+  completeProcessesOnCleanup,
 }: {
   configurationSource?: string;
   starterSource?: string;
-  piEditorResult?: string;
+  piEditorResult?: string | Promise<string | undefined>;
   processCompletion?: Promise<ProcessCompletion>;
+  readConfigurationSource?: () => Promise<string>;
+  completeProcessesOnCleanup?: () => void;
 } = {}) {
   const commands = new Map<string, RegisteredCommand>();
   const sessionStartHandlers: Array<
     (event: unknown, context: any) => Promise<void> | void
   > = [];
+  const shutdownHandlers: Array<() => Promise<void>> = [];
+  const processStarted = createDeferred<void>();
+  const piEditorOpened = createDeferred<void>();
   const observations: WiringObservations = {
     notifications: [],
     editorRequests: [],
@@ -89,6 +105,7 @@ function createConfigEditorWiringHarness({
           throw new Error("The process runner was not expected to start.");
         }
         observations.processCommands.push(command);
+        processStarted.resolve();
 
         return {
           completion: processCompletion,
@@ -98,13 +115,15 @@ function createConfigEditorWiringHarness({
         };
       },
       async cleanup() {
+        completeProcessesOnCleanup?.();
+
         return [];
       },
     },
     async readConfigurationFile() {
       observations.configurationReadCount += 1;
 
-      return configurationSource;
+      return readConfigurationSource === undefined ? configurationSource : readConfigurationSource();
     },
     async readStarterConfigurationSource() {
       return starterSource;
@@ -118,6 +137,8 @@ function createConfigEditorWiringHarness({
       on(event: string, handler: any) {
         if (event === "session_start") {
           sessionStartHandlers.push(handler);
+        } else if (event === "session_shutdown") {
+          shutdownHandlers.push(handler);
         }
       },
       registerCommand(name: string, command: RegisteredCommand) {
@@ -137,6 +158,7 @@ function createConfigEditorWiringHarness({
       ui: {
         async editor(title: string, source: string) {
           observations.editorRequests.push({ title, source });
+          piEditorOpened.resolve();
 
           return piEditorResult;
         },
@@ -149,6 +171,14 @@ function createConfigEditorWiringHarness({
 
   return {
     observations,
+    processStarted: processStarted.promise,
+    piEditorOpened: piEditorOpened.promise,
+    async shutdown() {
+      if (shutdownHandlers.length !== 1) {
+        throw new Error("The harness requires one shutdown handler.");
+      }
+      await shutdownHandlers[0]();
+    },
     async startSession(hasUI = true) {
       if (sessionStartHandlers.length !== 1) {
         throw new Error("The harness requires one session-start handler.");
@@ -193,6 +223,70 @@ describe("configuration wiring", () => {
     });
   });
   describe("edit configuration command", () => {
+    it("does not launch or report an editor when shutdown completes during handler resolution", async () => {
+      const resolving = createDeferred<void>();
+      const configuration = createDeferred<string>();
+      const harness = createConfigEditorWiringHarness({
+        readConfigurationSource() {
+          resolving.resolve();
+
+          return configuration.promise;
+        },
+        processCompletion: Promise.resolve({ type: "exited", exitCode: 0, signal: null }),
+      });
+      const command = harness.runCommand({ name: configEditorCommands.edit.name });
+      await resolving.promise;
+      await harness.shutdown();
+      configuration.resolve('[[handlers.configuration_editor]]\naction = ["editor", "--wait"]');
+      await command;
+      assert.deepEqual(harness.observations.processCommands, []);
+      assert.deepEqual(harness.observations.editorRequests, []);
+      assert.deepEqual(harness.observations.savedSources, []);
+      assert.deepEqual(harness.observations.notifications, []);
+      assert.equal(harness.observations.configurationReadCount, 1);
+    });
+    it("does not open fallback or revalidate when shutdown terminates the configured editor", async () => {
+      const completion = createPendingProcessCompletion();
+      const harness = createConfigEditorWiringHarness({
+        configurationSource: '[[handlers.configuration_editor]]\naction = ["editor", "--wait"]',
+        processCompletion: completion.promise,
+        completeProcessesOnCleanup() {
+          completion.resolve({ type: "exited", exitCode: null, signal: "SIGTERM" });
+        },
+      });
+      const command = harness.runCommand({ name: configEditorCommands.edit.name });
+      await harness.processStarted;
+      await harness.shutdown();
+      await command;
+      assert.deepEqual(harness.observations.processCommands, [["editor", "--wait"]]);
+      assert.deepEqual(harness.observations.editorRequests, []);
+      assert.deepEqual(harness.observations.savedSources, []);
+      assert.deepEqual(harness.observations.notifications, []);
+      assert.equal(harness.observations.configurationReadCount, 1);
+    });
+    it("does not save Pi editor text returned after shutdown or report completion", async () => {
+      const editedSource = createDeferred<string | undefined>();
+      const harness = createConfigEditorWiringHarness({ piEditorResult: editedSource.promise });
+      const command = harness.runCommand({ name: configEditorCommands.edit.name });
+      await harness.piEditorOpened;
+      await harness.shutdown();
+      editedSource.resolve("late edit");
+      await command;
+      assert.equal(harness.observations.editorRequests.length, 1);
+      assert.deepEqual(harness.observations.savedSources, []);
+      assert.deepEqual(harness.observations.notifications, []);
+      assert.equal(harness.observations.configurationReadCount, 1);
+    });
+    it("does not read configuration or launch an editor for a command admitted after shutdown", async () => {
+      const harness = createConfigEditorWiringHarness();
+      await harness.shutdown();
+      await harness.runCommand({ name: configEditorCommands.edit.name });
+      assert.equal(harness.observations.configurationReadCount, 0);
+      assert.deepEqual(harness.observations.processCommands, []);
+      assert.deepEqual(harness.observations.editorRequests, []);
+      assert.deepEqual(harness.observations.savedSources, []);
+      assert.deepEqual(harness.observations.notifications, []);
+    });
     it("runs the configured editor and revalidates after completion", async () => {
       const completion = createPendingProcessCompletion();
       const harness = createConfigEditorWiringHarness({

@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { describe, it, type TestContext } from "node:test";
+import { isErrorWithCode } from "#/errors/index.ts";
 import {
   extractToolPaths,
   isPathWithinWorkspace,
@@ -237,15 +238,83 @@ describe("path utilities", () => {
         },
       );
     });
+    it("resolves a missing suffix through a dangling directory symlink", async (testContext) => {
+      const directory = await createTemporaryDirectory(testContext);
+      const missingTarget = join(directory, "outside", "missing");
+      const linkedDirectory = join(directory, "linked");
+      await symlink(missingTarget, linkedDirectory, "junction");
+      assert.deepEqual(
+        await resolveCanonicalPath(join(linkedDirectory, "nested", "file.txt")),
+        {
+          success: true,
+          value: join(missingTarget, "nested", "file.txt"),
+          error: undefined,
+        },
+      );
+    });
+    it("resolves a relative dangling symlink from its parent directory", async (testContext) => {
+      const directory = await createTemporaryDirectory(testContext);
+      const linkedPath = join(directory, "linked-file");
+      await symlink("missing-file", linkedPath);
+      assert.deepEqual(await resolveCanonicalPath(linkedPath), {
+        success: true,
+        value: join(directory, "missing-file"),
+        error: undefined,
+      });
+    });
+    it("resolves multiple symlink hops ending at a missing destination", async (testContext) => {
+      const directory = await createTemporaryDirectory(testContext);
+      const firstLink = join(directory, "first-link");
+      const secondLink = join(directory, "second-link");
+      const missingTarget = join(directory, "missing-file");
+      await symlink(secondLink, firstLink);
+      await symlink(missingTarget, secondLink);
+      assert.deepEqual(await resolveCanonicalPath(firstLink), {
+        success: true,
+        value: missingTarget,
+        error: undefined,
+      });
+    });
     it("preserves a missing suffix beneath an ordinary existing ancestor", async (testContext) => {
       const directory = await createTemporaryDirectory(testContext);
       const missingPath = join(directory, "missing", "nested", "file.txt");
-
       assert.deepEqual(await resolveCanonicalPath(missingPath), {
         success: true,
         value: missingPath,
         error: undefined,
       });
+    });
+    it("fails when an existing file is used as a directory", async (testContext) => {
+      const directory = await createTemporaryDirectory(testContext);
+      const filePath = join(directory, "file.txt");
+      await writeFile(filePath, "content", "utf8");
+      const resolutionAttempt = await resolveCanonicalPath(
+        join(filePath, "child.txt"),
+      );
+      assert.equal(resolutionAttempt.success, false);
+      if (resolutionAttempt.success) {
+        assert.fail("Expected a non-directory ancestor to prevent resolution.");
+      }
+      assert.equal(
+        isErrorWithCode({ error: resolutionAttempt.error, code: "ENOTDIR" }),
+        true,
+      );
+    });
+    it("fails closed when symlinks form a loop", async (testContext) => {
+      const directory = await createTemporaryDirectory(testContext);
+      const loopPath = join(directory, "loop");
+      await symlink("loop", loopPath);
+      const resolutionAttempt = await resolveCanonicalPath(
+        join(loopPath, "file.txt"),
+      );
+      assert.equal(resolutionAttempt.success, false);
+      if (resolutionAttempt.success) {
+        assert.fail("Expected the symlink loop to prevent resolution.");
+      }
+      assert.equal(
+        isErrorWithCode({ error: resolutionAttempt.error, code: "ELOOP" }),
+        true,
+      );
     });
     it("returns an explicit failure when the path cannot be resolved", async () => {
       const resolution = await resolveCanonicalPath("\0");

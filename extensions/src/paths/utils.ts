@@ -7,7 +7,8 @@ import {
   isToolCallEventType,
   type ToolCallEvent,
 } from "@earendil-works/pi-coding-agent";
-import { realpath } from "node:fs/promises";
+import { access, lstat, readlink, realpath } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import {
   basename,
   dirname,
@@ -56,20 +57,57 @@ export function resolveInputPath({
   cwd: string;
   homeDirectory: string;
 }) {
-  let path = inputPath;
-  if (path.startsWith("@")) {
-    path = path.slice(1);
+  // Match Pi's local resolveToCwd semantics without importing private APIs.
+  const normalizedInput = inputPath
+    .replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, " ")
+    .replace(/^@/, "");
+  return resolve(
+    normalizeLocalPath({ path: cwd, homeDirectory }),
+    normalizeLocalPath({ path: normalizedInput, homeDirectory }),
+  );
+}
+
+function normalizeLocalPath({ path, homeDirectory }: {
+  path: string;
+  homeDirectory: string;
+}): string {
+  let normalized = path;
+  if (process.platform === "win32" && !path.startsWith("//") && !path.includes("\\")) {
+    const drive = path.match(/^\/(?:mnt\/|cygdrive\/)?([a-z])(?:\/(.*))?$/i);
+    if (drive !== null) {
+      normalized = `${drive[1]!.toUpperCase()}:\\${drive[2]?.replaceAll("/", "\\") ?? ""}`;
+    }
   }
-  if (path === "~") {
-    path = homeDirectory;
-  } else if (
-    path.startsWith("~/") ||
-    (sep === "\\" && path.startsWith("~\\"))
-  ) {
-    path = join(homeDirectory, path.slice(2));
+  if (normalized === "~") {
+    return homeDirectory;
+  }
+  if (normalized.startsWith("~/") || (sep === "\\" && normalized.startsWith("~\\"))) {
+    return join(homeDirectory, normalized.slice(2));
+  }
+  if (normalized.startsWith("file://")) {
+    return fileURLToPath(normalized);
+  }
+  return normalized;
+}
+
+export async function resolveReadCandidate(path: string): Promise<string> {
+  const decomposedPath = path.normalize("NFD");
+  const candidates = [
+    path,
+    path.replace(/ (AM|PM)\./gi, "\u202F$1."),
+    decomposedPath,
+    path.replace(/'/g, "\u2019"),
+    decomposedPath.replace(/'/g, "\u2019"),
+  ];
+  // Match Pi's ordered read fallbacks and its F_OK existence checks.
+  for (const candidate of new Set(candidates)) {
+    const existence = await attempt(() => access(candidate));
+    if (existence.success) {
+      return candidate;
+    }
   }
 
-  return resolve(cwd, path);
+  return path;
 }
 
 export async function resolveCanonicalPath(
@@ -78,19 +116,51 @@ export async function resolveCanonicalPath(
   const missingPathSegments: Array<string> = [];
   let candidatePath = path;
   while (true) {
-    const resolution = await attempt(() => realpath(candidatePath));
-    if (resolution.success) {
-      return attempt.value(join(resolution.value, ...missingPathSegments));
+    const candidateAttempt = await attempt(() => lstat(candidatePath));
+    if (candidateAttempt.success) {
+      if (candidateAttempt.value.isSymbolicLink()) {
+        const symlinkResolutionAttempt = await attempt(() =>
+          realpath(candidatePath),
+        );
+        if (symlinkResolutionAttempt.success) {
+          return attempt.value(
+            join(symlinkResolutionAttempt.value, ...missingPathSegments),
+          );
+        }
+        if (
+          !isErrorWithCode({
+            error: symlinkResolutionAttempt.error,
+            code: "ENOENT",
+          })
+        ) {
+          return attempt.error(symlinkResolutionAttempt.error);
+        }
+        const linkTargetAttempt = await attempt(() => readlink(candidatePath));
+        if (!linkTargetAttempt.success) {
+          return attempt.error(linkTargetAttempt.error);
+        }
+        const targetPath = resolve(
+          dirname(candidatePath),
+          linkTargetAttempt.value,
+        );
+
+        return resolveCanonicalPath(join(targetPath, ...missingPathSegments));
+      }
+      const resolutionAttempt = await attempt(() => realpath(candidatePath));
+      if (!resolutionAttempt.success) {
+        return attempt.error(resolutionAttempt.error);
+      }
+
+      return attempt.value(
+        join(resolutionAttempt.value, ...missingPathSegments),
+      );
     }
-    const pathIsMissing =
-      isErrorWithCode({ error: resolution.error, code: "ENOENT" }) ||
-      isErrorWithCode({ error: resolution.error, code: "ENOTDIR" });
-    if (!pathIsMissing) {
-      return attempt.error(resolution.error);
+    if (!isErrorWithCode({ error: candidateAttempt.error, code: "ENOENT" })) {
+      return attempt.error(candidateAttempt.error);
     }
     const parentPath = dirname(candidatePath);
     if (parentPath === candidatePath) {
-      return attempt.error(resolution.error);
+      return attempt.error(candidateAttempt.error);
     }
     missingPathSegments.unshift(basename(candidatePath));
     candidatePath = parentPath;

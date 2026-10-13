@@ -10,9 +10,11 @@ export type ConfigEditOutcome =
     }
   | { type: "pi-editor-saved" }
   | { type: "pi-editor-cancelled" }
-  | { type: "editor-unavailable" };
+  | { type: "editor-unavailable" }
+  | { type: "shutdown" };
 
 export type ConfigEditorDependencies = {
+  isShuttingDown?(): boolean;
   ensureConfigurationFile(): Promise<EnsuredConfigurationFile>;
   resolveConfigurationEditor(): Promise<
     [executable: string, ...args: Array<string>] | undefined

@@ -2,9 +2,10 @@
 
 ## Scope and review
 
-- Complete one `task.md` section at a time and stop at every review checkpoint.
-- Record completed work by ticking only the applicable `task.md` checkboxes.
-- Record approved product/architecture deviations in `plan_modifications.md` and update the related task item in the same change.
+- Complete one delivery stage and its embedded checklist in `implementation_plan.md` at a time, then stop at its review checkpoint.
+- During codebase-wide reviews, report issues and proposed fixes before making changes. Keep the review read-only until the user approves the changes.
+- Record completed work by ticking only the applicable checkboxes in `implementation_plan.md`.
+- Update the authoritative behavior and related checklist item in `implementation_plan.md` when a product or architecture change is approved, then record its rationale in `plan_changelog.md`.
 - The user performs manual Pi testing and runs verification commands. Do not run tests unless explicitly asked.
 - Perform every manual or ad hoc filesystem test entirely within a dedicated directory under the operating system temporary directory. All test workspaces, paths, files, and symlinks—including the primary workspace—must remain below that temporary root. Never create, modify, link, or delete test artifacts in the repository or any other non-temporary directory.
 
@@ -35,7 +36,10 @@
 - Use a direct parameter when a project-defined function accepts exactly one argument. Use a named parameter object when it accepts multiple arguments; framework callbacks and third-party APIs retain their required signatures.
 - Use block statements for `if`/control-flow bodies and functions. Avoid terse one-line arrow functions except when the user explicitly prefers one.
 - Preserve the user's established formatting. Ask before resolving ambiguous formatting choices.
-- Treat specs as executable documentation: they must read clearly from top to bottom, use deliberate behavioral grouping and names, hide incidental setup behind readable helpers, and avoid brittle or implementation-heavy assertions.
+- Avoid blank lines within function bodies except to separate return statements from surrounding code. Separate top-level declarations with a blank line, but keep all import statements together without blank lines between them. Separate the import block from the rest of the file with a blank line.
+- Treat specs as executable documentation: they must read clearly from top to bottom, use one feature-level `describe` with deliberate nested behavioral groups, hide incidental setup behind readable helpers, and avoid brittle or implementation-heavy assertions.
+- Give every `describe` and `it` block a behaviorally complete description. A `describe` names the feature or significant behavioral context it groups; an `it` states the significant condition and expected outcome. Prefer clarity over artificial brevity without repeating incidental setup details.
 - Name shared conceptual test values once at their nearest common scope. Avoid repeated literals, setup, and expected values within one spec when they represent the same concept; duplication across specs or features is acceptable when their test dynamics differ.
 - Keep test machinery local to its spec file, generally as module-level helpers outside `describe`/`it`. Helpers may arrange inputs, dependencies, fakes, and captured outputs, but must not contain assertions; every assertion remains visible in its `it` block. Do not build shared cross-spec fixture, harness, or fake frameworks; tests may repeat boundary setup to remain independent and purpose-specific.
 - Across feature boundaries, use the `#/` alias and import public APIs only from the feature's `index.ts`. Same-feature code may use relative imports. Behavioral tests use public feature indexes; focused internal utility specs may deep-import the internal module they explicitly exercise.
+- Do not export or re-export a symbol for anticipated use or testing alone. Add it to a feature's public index only when an implemented cross-feature consumer requires it.

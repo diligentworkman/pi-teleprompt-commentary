@@ -13,6 +13,7 @@ import { registerTelepromptCommentary } from "#/index.ts";
 import type { ProcessCompletion } from "#/process/index.ts";
 import {
   commands as workspaceCommands,
+  errorMessageTemplates,
   warningMessageTemplates,
   workspaceEntryType,
 } from "#/workspaces/index.ts";
@@ -192,7 +193,40 @@ function createWorkspacesOpenHarness({
   };
 }
 
+function createPendingRejectedCompletion() {
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<ProcessCompletion>((_resolve, fail) => {
+    reject = fail;
+  });
+
+  return { promise, reject };
+}
+
 describe("workspaces-open wiring", () => {
+  it("starts the entire group without awaiting completion and reports one rejected observer without an unhandled rejection", async (testContext) => {
+    const cwd = await createTemporaryDirectory(testContext);
+    const additionalWorkspace = join(cwd, "additional-workspace");
+    const completion = createPendingRejectedCompletion();
+    const observationError = new Error("completion observer failed");
+    const harness = createWorkspacesOpenHarness({
+      configurationSource: openerConfiguration,
+      processCompletions: [completion.promise, Promise.resolve(cleanCompletion)],
+    });
+    await harness.restore({ cwd, additionalWorkspaces: [additionalWorkspace] });
+    await harness.openAll({ cwd });
+    assert.deepEqual(harness.processCommands, [
+      ["workspace-opener", cwd, "--group=workspace-group-id"],
+      ["workspace-opener", additionalWorkspace, "--group=workspace-group-id"],
+    ]);
+    assert.deepEqual(harness.observedNotifications, []);
+    completion.reject(observationError);
+    await nextEventLoopTurn();
+    assert.deepEqual(harness.observedNotifications, [{
+      message: errorMessageTemplates.workspaceOpenFailed({ workspacePath: cwd, errorMessage: observationError.message }),
+      type: "warning",
+    }]);
+    assert.equal(harness.generatedGroupIdCount, 1);
+  });
   it("uses one group ID and continues after an opener spawn failure", async (testContext) => {
     const cwd = await createTemporaryDirectory(testContext);
     const additionalWorkspace = join(cwd, "additional-workspace");

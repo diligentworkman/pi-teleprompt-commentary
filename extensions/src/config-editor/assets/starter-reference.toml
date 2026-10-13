@@ -6,7 +6,8 @@
 #
 # Rules are ordered under handlers.<name> or hooks.<name>. Every rule requires an
 # action. Optional condition keys begin with "var:". Every condition in a rule
-# must match, and the final matching rule wins.
+# must match. For handlers, the final matching rule wins. For hooks, every
+# matching command is dispatched independently in declaration order.
 #
 # Conditions are JavaScript regular expressions, not globs. Matching is by
 # substring unless anchors are used. A string is an expression without flags.

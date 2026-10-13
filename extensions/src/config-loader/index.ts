@@ -10,12 +10,14 @@ import {
   loadConfiguration,
   resolveConfigPath,
   resolveRawAction,
+  ruleConditionsMatch,
 } from "./utils.ts";
 
 export { resolveConfigPath };
 export type {
   ConfigLoader,
   ConfigurationLoaderDependencies,
+  ResolvedAction,
   ResolvedCommand,
   VariablesFor,
 } from "./types.ts";
@@ -47,16 +49,11 @@ export function createConfigLoader(
         variables,
       }) as ResolvedHandlerAction<TCategory>;
     },
-    async resolveHook({ hook, variables }) {
-      const rawAction = resolveRawAction({
-        rules: (await loadConfiguration(dependencies)).hooks[hook] ?? [],
-        variables,
-      });
-      if (rawAction === undefined) {
-        return undefined;
-      }
-
-      return expandCommand({ command: rawAction, variables });
+    async resolveHooks({ hook, variables }) {
+      const rules = (await loadConfiguration(dependencies)).hooks[hook] ?? [];
+      return rules
+        .filter((rule) => ruleConditionsMatch({ conditions: rule.conditions, variables }))
+        .map((rule) => expandCommand({ command: rule.action, variables }));
     },
   };
 }

@@ -40,9 +40,10 @@ export PI_TELEPROMPT_PRIMARY_WORKSPACE="$primary_workspace"
 export PI_TELEPROMPT_PI="$pi_executable"
 
 printf '\nManual Pi test environment\n'
-printf '  Project:           %s\n' "$PI_TELEPROMPT_PROJECT_ROOT"
-printf '  Temporary root:    %s\n' "$PI_TELEPROMPT_TEST_ROOT"
-printf '  Primary workspace: %s\n' "$PI_TELEPROMPT_PRIMARY_WORKSPACE"
+printf '  Project (PI_TELEPROMPT_PROJECT_ROOT):             %s\n' "$PI_TELEPROMPT_PROJECT_ROOT"
+printf '  Temporary root (PI_TELEPROMPT_TEST_ROOT):         %s\n' "$PI_TELEPROMPT_TEST_ROOT"
+printf '  Primary workspace (PI_TELEPROMPT_PRIMARY_WORKSPACE): %s\n' "$PI_TELEPROMPT_PRIMARY_WORKSPACE"
+printf '  Pi executable (PI_TELEPROMPT_PI):                 %s\n' "$PI_TELEPROMPT_PI"
 printf '\nAll manual test artifacts must remain below the temporary root.\n'
 printf 'Create scenario-specific workspaces and fixtures from this shell.\n'
 printf '\nStart Pi with the prepared command:\n'

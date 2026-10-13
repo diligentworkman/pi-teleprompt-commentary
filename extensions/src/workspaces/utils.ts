@@ -1,6 +1,6 @@
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { ConfigLoader } from "#/config-loader/index.ts";
-import { getErrorMessage } from "#/errors/index.ts";
+import { attempt, getErrorMessage } from "#/errors/index.ts";
 import type { ProcessRunner } from "#/process/index.ts";
 import { realpath, stat } from "node:fs/promises";
 import { workspaceEntryType } from "./constants.ts";
@@ -46,13 +46,26 @@ export async function openWorkspace({
   configLoader,
   processRunner,
   reportWarning,
+  isShuttingDown,
 }: {
   workspacePath: string;
   groupId: string;
   configLoader: ConfigLoader;
   processRunner: ProcessRunner;
   reportWarning(message: string): void;
+  isShuttingDown?(): boolean;
 }) {
+  if (isShuttingDown?.()) {
+    return;
+  }
+  const reportOpenerWarning = (message: string): void => {
+    if (isShuttingDown?.()) {
+      return;
+    }
+    attempt.sync(() => {
+      reportWarning(message);
+    });
+  };
   let command;
   try {
     command = await configLoader.resolveHandler({
@@ -60,7 +73,10 @@ export async function openWorkspace({
       variables: { directory_path: workspacePath, group_id: groupId },
     });
   } catch (error) {
-    reportWarning(
+    if (isShuttingDown?.()) {
+      return;
+    }
+    reportOpenerWarning(
       errorMessageTemplates.workspaceOpenFailed({
         workspacePath,
         errorMessage: getErrorMessage(error),
@@ -69,8 +85,12 @@ export async function openWorkspace({
 
     return;
   }
+  // Handler resolution can outlive the runtime's process-cleanup pass.
+  if (isShuttingDown?.()) {
+    return;
+  }
   if (command === undefined) {
-    reportWarning(
+    reportOpenerWarning(
       warningMessageTemplates.workspaceOpenerNotConfigured(workspacePath),
     );
 
@@ -80,7 +100,7 @@ export async function openWorkspace({
   try {
     runningProcess = processRunner.start({ command });
   } catch (error) {
-    reportWarning(
+    reportOpenerWarning(
       errorMessageTemplates.workspaceOpenFailed({
         workspacePath,
         errorMessage: getErrorMessage(error),
@@ -89,13 +109,25 @@ export async function openWorkspace({
 
     return;
   }
-  void runningProcess.completion.then((completion) => {
+  void attempt(async () => {
+    const observation = await attempt(() => {
+      return runningProcess.completion;
+    });
+    if (!observation.success) {
+      reportOpenerWarning(errorMessageTemplates.workspaceOpenFailed({
+        workspacePath,
+        errorMessage: getErrorMessage(observation.error),
+      }));
+
+      return;
+    }
+    const completion = observation.value;
     if (
       completion.type !== "exited" ||
       completion.exitCode !== 0 ||
       completion.signal !== null
     ) {
-      reportWarning(
+      reportOpenerWarning(
         warningMessageTemplates.workspaceOpenerDidNotExitCleanly({
           workspacePath,
           completion,

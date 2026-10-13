@@ -3,4 +3,5 @@ export {
   isPathWithinWorkspace,
   resolveCanonicalPath,
   resolveInputPath,
+  resolveReadCandidate,
 } from "./utils.ts";
