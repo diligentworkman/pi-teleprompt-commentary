@@ -23,22 +23,22 @@
 # accept command actions only.
 
 # configuration_editor
-# Available variable: config_file_path
+# Available variable: configuration_file_path
 # Include a waiting flag when an editor otherwise detaches, because only the
 # directly spawned process can be tracked.
 [[handlers.configuration_editor]]
-"var:config_file_path" = '\.toml$'
-action = ["code", "--wait", { var = "config_file_path" }]
+"var:configuration_file_path" = '\.toml$'
+action = ["code", "--wait", { var = "configuration_file_path" }]
 
 # workspace_opener
-# Available variables: directory_path, group_id
+# Available variables: workspace_directory_path, workspace_group_id
 [[handlers.workspace_opener]]
-"var:directory_path" = ['^/workspace/', 'i']
+"var:workspace_directory_path" = ['^/workspace/', 'i']
 action = [
   "code",
   "--new-window",
-  { var = "directory_path" },
-  { var = "group_id", prepend = "--group=", append = "-window" },
+  { var = "workspace_directory_path" },
+  { var = "workspace_group_id", prepend = "--group=", append = "-window" },
 ]
 
 # diff_editor

@@ -756,7 +756,9 @@ describe("configuration loader utilities", () => {
   });
   describe("parseTomlDocument", () => {
     it("parses a valid TOML document", () => {
-      assert.deepEqual(parseTomlDocument("enabled = true"), { enabled: true });
+      const document = parseTomlDocument("enabled = true");
+      assert.ok(typeof document === "object" && document !== null);
+      assert.deepEqual(Object.entries(document), [["enabled", true]]);
     });
     it("throws for invalid TOML syntax", () => {
       assert.throws(() => parseTomlDocument("enabled = ["));

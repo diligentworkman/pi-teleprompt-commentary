@@ -37,6 +37,8 @@ With no matching configuration rule:
 
 The primary workspace is automatically permitted. Additional workspaces are canonical directories explicitly added to the session. Symlink targets are considered during path authorization; similar-looking sibling names do not inherit permission. Same-path file mutations are reserved while review/execution is pending; a conflicting call is blocked rather than silently queued.
 
+Path reservations coordinate intercepted file mutations only within one extension runtime. They are not OS locks and do not coordinate other Pi sessions, editors, Bash commands, custom tools, or external processes. Reservations are in-memory and do not survive replacement of the extension runtime.
+
 **Bash, custom tools, external programs, and filesystem races can bypass these boundaries.** User `!`/`!!` shell commands are not intercepted. Do not treat workspace permission as containment of arbitrary code.
 
 ## Commands
@@ -63,6 +65,8 @@ The optional global TOML file is:
 The default agent directory is `~/.pi/agent`. There is no workspace-local extension configuration.
 
 Run `/tc:edit-config` to generate the **fully commented TOML reference**, which is the complete configuration reference. Examples are inactive until uncommented; this README intentionally does not duplicate the full schema.
+
+Configuration editors use `configuration_file_path`; workspace openers use `workspace_directory_path` and `workspace_group_id`. Update existing TOML placeholders and `var:` conditions to these names; the former short names are not accepted as aliases. Invalid names trigger configuration warnings and fallback to defaults.
 
 High-level semantics:
 

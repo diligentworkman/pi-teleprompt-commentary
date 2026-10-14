@@ -17,6 +17,39 @@ function createConfigLoaderHarness(
 }
 
 describe("configuration loader", () => {
+  it("matches and expands the full configuration and workspace variable names without splitting arguments", async () => {
+    const configurationFilePath = "/configuration/with spaces.toml";
+    const workspaceDirectoryPath = "/workspace/with spaces";
+    const workspaceGroupId = "group with spaces";
+    const { loader, warnings } = createConfigLoaderHarness(async () => {
+      return `
+[[handlers.configuration_editor]]
+"var:configuration_file_path" = '\\.toml$'
+action = ["editor", { var = "configuration_file_path" }]
+[[handlers.workspace_opener]]
+"var:workspace_directory_path" = '^/workspace/'
+"var:workspace_group_id" = '^group '
+action = ["opener", { var = "workspace_directory_path" }, { var = "workspace_group_id", prepend = "--group=" }]
+`;
+    });
+    assert.deepEqual(await loader.resolveHandler({
+      category: "configuration_editor",
+      variables: { configuration_file_path: configurationFilePath },
+    }), ["editor", configurationFilePath]);
+    assert.deepEqual(await loader.resolveHandler({
+      category: "workspace_opener",
+      variables: { workspace_directory_path: workspaceDirectoryPath, workspace_group_id: workspaceGroupId },
+    }), ["opener", workspaceDirectoryPath, `--group=${workspaceGroupId}`]);
+    assert.equal(await loader.resolveHandler({
+      category: "workspace_opener",
+      variables: { workspace_directory_path: "/outside", workspace_group_id: workspaceGroupId },
+    }), undefined);
+    assert.equal(await loader.resolveHandler({
+      category: "workspace_opener",
+      variables: { workspace_directory_path: workspaceDirectoryPath, workspace_group_id: "unmatched" },
+    }), undefined);
+    assert.deepEqual(warnings, []);
+  });
   it("resolves all matching hooks in declaration order with direct-argv placeholder expansion", async () => {
     const { loader, warnings } = createConfigLoaderHarness(async () => `
 [[hooks.assistant_message_end]]

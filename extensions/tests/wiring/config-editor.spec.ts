@@ -292,7 +292,7 @@ describe("configuration wiring", () => {
       const harness = createConfigEditorWiringHarness({
         configurationSource: `
 [[handlers.configuration_editor]]
-action = ["editor", "--wait", "argument with spaces", { var = "config_file_path" }]
+action = ["editor", "--wait", "argument with spaces", { var = "configuration_file_path" }]
 `,
         processCompletion: completion.promise,
       });
@@ -335,7 +335,7 @@ action = ["editor", "--wait", "argument with spaces", { var = "config_file_path"
       };
       const configurationSource = `
 [[handlers.configuration_editor]]
-action = ["editor", "--wait", { var = "config_file_path" }]
+action = ["editor", "--wait", { var = "configuration_file_path" }]
 `;
       const cancelledEditorResult = undefined;
       const harness = createConfigEditorWiringHarness({

@@ -151,7 +151,7 @@ function createHarness({ cwd, additionalWorkspaces = [], selection }: {
 }
 
 describe("workspace opener shutdown wiring", () => {
-  const configuration = '[[handlers.workspace_opener]]\naction = ["opener", { var = "directory_path" }]';
+  const configuration = '[[handlers.workspace_opener]]\naction = ["opener", { var = "workspace_directory_path" }]';
   for (const kind of ["single", "group"] as const) {
     const name = kind === "single" ? workspaceCommands.open.name : workspaceCommands.openAll.name;
     it(`does not launch ${kind} openers after shutdown completes during configuration loading`, async (testContext) => {

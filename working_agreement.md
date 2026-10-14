@@ -2,10 +2,10 @@
 
 ## Scope and review
 
-- Complete one delivery stage and its embedded checklist in `implementation_plan.md` at a time, then stop at its review checkpoint.
+- Agree on a bounded change and its verification requirements, then stop at the agreed review checkpoint.
 - During codebase-wide reviews, report issues and proposed fixes before making changes. Keep the review read-only until the user approves the changes.
-- Record completed work by ticking only the applicable checkboxes in `implementation_plan.md`.
-- Update the authoritative behavior and related checklist item in `implementation_plan.md` when a product or architecture change is approved, then record its rationale in `plan_changelog.md`.
+- Report completed changes and verification accurately; distinguish passed checks from deferred or unverified checks.
+- Update user-facing documentation when approved behavior changes affect usage or limitations.
 - The user performs manual Pi testing and runs verification commands. Do not run tests unless explicitly asked.
 - Perform every manual or ad hoc filesystem test entirely within a dedicated directory under the operating system temporary directory. All test workspaces, paths, files, and symlinks—including the primary workspace—must remain below that temporary root. Never create, modify, link, or delete test artifacts in the repository or any other non-temporary directory.
 

@@ -49,7 +49,7 @@ function createStaticConfigLoader(source: string) {
 describe("workspace opener lifecycle", () => {
   const workspacePath = "/workspace";
   const groupId = "workspace-group";
-  const configurationSource = '[[handlers.workspace_opener]]\naction = ["opener", { var = "directory_path" }, { var = "group_id" }]';
+  const configurationSource = '[[handlers.workspace_opener]]\naction = ["opener", { var = "workspace_directory_path" }, { var = "workspace_group_id" }]';
   describe("when observing opener completion", () => {
     it("returns before completion and reports a rejected observer best-effort", async () => {
       const completion = createDeferred<ProcessCompletion>();

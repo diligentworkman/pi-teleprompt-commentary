@@ -6,14 +6,14 @@ import type {
 } from "./types.ts";
 
 export const variableNames = [
-  "config_file_path",
+  "configuration_file_path",
   "new_file_path",
   "old_content_file_path",
   "new_content_file_path",
   "command_file_path",
   "command_string",
-  "directory_path",
-  "group_id",
+  "workspace_directory_path",
+  "workspace_group_id",
   "assistant_message_text",
   "tool_name",
 ] as const;
@@ -35,8 +35,8 @@ export const hookNames = [
 ] as const;
 
 export const availableHandlerVariables = {
-  configuration_editor: ["config_file_path"],
-  workspace_opener: ["directory_path", "group_id"],
+  configuration_editor: ["configuration_file_path"],
+  workspace_opener: ["workspace_directory_path", "workspace_group_id"],
   diff_editor: ["old_content_file_path", "new_content_file_path"],
   new_file_editor: ["new_file_path"],
   command_editor: ["command_file_path", "command_string"],

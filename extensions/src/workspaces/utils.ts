@@ -70,7 +70,7 @@ export async function openWorkspace({
   try {
     command = await configLoader.resolveHandler({
       category: "workspace_opener",
-      variables: { directory_path: workspacePath, group_id: groupId },
+      variables: { workspace_directory_path: workspacePath, workspace_group_id: groupId },
     });
   } catch (error) {
     if (isShuttingDown?.()) {

@@ -29,7 +29,7 @@ export function resolveConfigurationEditorCommand({
 }) {
   return configLoader.resolveHandler({
     category: "configuration_editor",
-    variables: { config_file_path: configFilePath },
+    variables: { configuration_file_path: configFilePath },
   });
 }
 

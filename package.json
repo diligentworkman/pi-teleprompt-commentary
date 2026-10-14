@@ -12,20 +12,12 @@
     "#/*": "./extensions/src/*"
   },
   "files": [
-    "extensions",
-    "skills",
-    "prompts",
+    "extensions/src",
     "README.md"
   ],
   "pi": {
     "extensions": [
       "./extensions/src/index.ts"
-    ],
-    "skills": [
-      "./skills"
-    ],
-    "prompts": [
-      "./prompts"
     ]
   },
   "scripts": {

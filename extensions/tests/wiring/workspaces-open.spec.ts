@@ -34,8 +34,8 @@ action = ["earlier-opener"]
 [[handlers.workspace_opener]]
 action = [
   "workspace-opener",
-  { var = "directory_path" },
-  { var = "group_id", prepend = "--group=" }
+  { var = "workspace_directory_path" },
+  { var = "workspace_group_id", prepend = "--group=" }
 ]
 `;
 
