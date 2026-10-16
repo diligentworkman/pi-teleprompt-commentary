@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
 import { attempt } from "#/errors/index.ts";
-import { applyFilePostToolActions } from "#/file-review/post-tool.ts";
+import { applyFilePostToolActions } from "#/file-review/index.ts";
 
 async function fixture(testContext: TestContext) {
   const root = await realpath(await mkdtemp(join(tmpdir(), "teleprompt-file-result-")));
@@ -47,6 +47,112 @@ describe("file post-tool actions", () => {
     assert.match(annotated[1]?.type === "text" ? annotated[1].text : "", /could not be applied: disk unavailable/);
     assert.equal(JSON.stringify(annotated).includes("private diff"), false);
     assert.match(annotated[2]?.type === "text" ? annotated[2].text : "", /My note/);
+  });
+
+  describe("when reviewed content has a change summary result", () => {
+    const summary = "User review changes (agent proposal → reviewed content):\n- Modified: proposal line 1 → reviewed line 1";
+    it("appends the summary after successfully applying reviewed bytes without altering native result blocks", async (testContext) => {
+      const root = await fixture(testContext);
+      const target = join(root, "file.txt");
+      const reviewed = Buffer.from("reviewed content\n");
+      const originalContent = [{ type: "text" as const, text: "Pi's native output" }];
+      const annotated = await applyFilePostToolActions({
+        actions: [
+          {
+            type: "apply-reviewed-content",
+            canonicalPath: target,
+            content: reviewed,
+            changeSummary: attempt.value(summary),
+          },
+          { type: "append-user-feedback", feedback: "Keep this change." },
+        ],
+        content: originalContent,
+      });
+      assert.deepEqual(await readFile(target), reviewed);
+      assert.equal(annotated[0], originalContent[0]);
+      assert.deepEqual(annotated.slice(1), [
+        { type: "text", text: "The user's reviewed file content was applied after Pi's tool call." },
+        { type: "text", text: summary },
+        { type: "text", text: "User feedback on approval: Keep this change." },
+      ]);
+      assert.deepEqual(originalContent, [{ type: "text", text: "Pi's native output" }]);
+    });
+    it("adds no summary annotation when summary generation succeeded without reportable changes", async (testContext) => {
+      const root = await fixture(testContext);
+      const target = join(root, "file.txt");
+      const reviewed = Buffer.from("reviewed content\n");
+      const annotated = await applyFilePostToolActions({
+        actions: [{
+          type: "apply-reviewed-content",
+          canonicalPath: target,
+          content: reviewed,
+          changeSummary: attempt.value(undefined),
+        }],
+        content: [],
+      });
+      assert.deepEqual(await readFile(target), reviewed);
+      assert.deepEqual(annotated, [
+        { type: "text", text: "The user's reviewed file content was applied after Pi's tool call." },
+      ]);
+    });
+    for (const { error, message } of [
+      { error: new Error("diff unavailable"), message: "diff unavailable" },
+      { error: undefined, message: "undefined" },
+    ]) {
+      it(`applies reviewed bytes and reports summary failure without replacing the original error (${message})`, async (testContext) => {
+        const root = await fixture(testContext);
+        const target = join(root, "file.txt");
+        const reviewed = Buffer.from("reviewed content\n");
+        const changeSummary = attempt.error(error);
+        const annotated = await applyFilePostToolActions({
+          actions: [{
+            type: "apply-reviewed-content",
+            canonicalPath: target,
+            content: reviewed,
+            changeSummary,
+          }],
+          content: [],
+        });
+        assert.deepEqual(await readFile(target), reviewed);
+        assert.equal(changeSummary.error, error);
+        assert.equal(changeSummary.success, false);
+        assert.deepEqual(annotated, [
+          { type: "text", text: "The user's reviewed file content was applied after Pi's tool call." },
+          { type: "text", text: `Review change summary unavailable: ${message}` },
+        ]);
+      });
+    }
+    for (const { name, changeSummary } of [
+      { name: "generated summary", changeSummary: attempt.value(summary) },
+      { name: "summary failure", changeSummary: attempt.error(new Error("diff unavailable")) },
+    ]) {
+      it(`suppresses the ${name} when application fails while retaining the application error and feedback`, async (testContext) => {
+        const root = await fixture(testContext);
+        const target = join(root, "file.txt");
+        const originalError = new Error("disk unavailable");
+        const originalContent = [{ type: "text" as const, text: "Pi's native output" }];
+        const annotated = await applyFilePostToolActions({
+          actions: [
+            {
+              type: "apply-reviewed-content",
+              canonicalPath: target,
+              content: Buffer.from("reviewed content\n"),
+              changeSummary,
+            },
+            { type: "append-user-feedback", feedback: "Keep this change." },
+          ],
+          content: originalContent,
+          async applyReviewedContent() {
+            return attempt.error(originalError);
+          },
+        });
+        assert.equal(annotated[0], originalContent[0]);
+        assert.deepEqual(annotated.slice(1), [
+          { type: "text", text: "The user's reviewed file content could not be applied: disk unavailable" },
+          { type: "text", text: "User feedback on approval: Keep this change." },
+        ]);
+      });
+    }
   });
 
   it("returns original blocks unchanged when no actions exist", async () => {

@@ -1,6 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { runRestoredPiFilePreview, type PiFilePreviewInput } from "#/file-preview/index.ts";
-import { attempt, getErrorMessage } from "#/errors/index.ts";
+import { attempt, getErrorMessage, type AttemptResult } from "#/errors/index.ts";
 import type { ProcessRunner } from "#/process/index.ts";
 import { coordinateReview } from "#/review-coordinator/index.ts";
 import { conductPromptReview, evaluateReviewPolicy, reviewPolicyBlockMessageTemplates } from "#/review-policies/index.ts";
@@ -8,16 +8,17 @@ import type { ReviewDecisionInput, ReviewDecisionOutcome, ReviewFeedbackInput } 
 import { readFile } from "node:fs/promises";
 import { startFileExternalReview } from "./external.ts";
 import type { PreparedFileReview } from "./policy-preparation.ts";
+import { summarizeFileReviewChanges } from "./utils.ts";
 
 export type FileReviewOutcome =
   | { type: "allowed"; feedback?: string }
-  | { type: "reviewed"; content: Buffer }
+  | { type: "reviewed"; content: Buffer; changeSummary: AttemptResult<string | undefined> }
   | { type: "blocked"; reason: string };
 
 export async function reviewPreparedFile({
   prepared,
   input: { canonicalPath, preview, toolCallId, ctx, hasUI, signal },
-  dependencies: { processRunner, requestDecision, requestFeedback, readProposal = readFile },
+  dependencies: { processRunner, requestDecision, requestFeedback, readProposal = readFile, summarizeChanges = summarizeFileReviewChanges },
 }: {
   prepared: PreparedFileReview;
   input: {
@@ -33,6 +34,7 @@ export async function reviewPreparedFile({
     requestDecision(input: ReviewDecisionInput): Promise<ReviewDecisionOutcome>;
     requestFeedback(input: ReviewFeedbackInput): Promise<string | undefined>;
     readProposal?(path: string): Promise<Buffer>;
+    summarizeChanges?: typeof summarizeFileReviewChanges;
   };
 }): Promise<FileReviewOutcome> {
   const review = await attempt(async (): Promise<FileReviewOutcome> => {
@@ -91,9 +93,19 @@ export async function reviewPreparedFile({
         } else if (coordinated.type === "prompt-rejected") {
           decision = { type: "blocked", reason: reviewPolicyBlockMessageTemplates.rejected(coordinated.feedback) };
         } else if (coordinated.type === "external-decided") {
-          decision = coordinated.value.type === "unchanged"
-            ? { type: "allowed" }
-            : { type: "reviewed", content: coordinated.value.content };
+          if (coordinated.value.type === "unchanged") {
+            decision = { type: "allowed" };
+          } else {
+            const content = coordinated.value.content;
+            decision = {
+              type: "reviewed",
+              content,
+              changeSummary: attempt.sync(() => summarizeChanges({
+                proposal: originalProposal.toString("utf8"),
+                reviewed: content.toString("utf8"),
+              })),
+            };
+          }
         } else if (coordinated.type === "cancelled") {
           decision = { type: "blocked", reason: "The file review was cancelled." };
         }

@@ -2,6 +2,7 @@ import type {
   ExtensionAPI,
   ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
+import { commentarySystemPrompt } from "#/commentary/index.ts";
 import { dispatchHookCommands } from "#/event-hooks/index.ts";
 import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import { reviewBashCommand } from "#/bash-review/index.ts";
@@ -525,6 +526,7 @@ export function registerTelepromptCommentary({
             type: "apply-reviewed-content",
             canonicalPath,
             content: completed.value.content,
+            changeSummary: completed.value.changeSummary,
           },
         });
       } else if (completed.value.feedback !== undefined) {
@@ -650,7 +652,7 @@ export function registerTelepromptCommentary({
       contextSources,
     });
 
-    return { systemPrompt: `${event.systemPrompt}\n\n${workspaceContext}` };
+    return { systemPrompt: `${event.systemPrompt}\n\n${commentarySystemPrompt}\n\n${workspaceContext}` };
   });
   pi.registerCommand(configEditorCommands.edit.name, {
     description: configEditorCommands.edit.description,

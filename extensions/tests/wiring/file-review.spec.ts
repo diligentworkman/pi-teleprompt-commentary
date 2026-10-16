@@ -89,6 +89,8 @@ function deferred<T>() {
 }
 
 describe("external file review wiring", () => {
+  const summaryHeading = "User review changes (agent proposal → reviewed content; line numbers refer to those versions):";
+  const singleLineSummary = `${summaryHeading}\n- Modified: proposal line 1 → reviewed line 1`;
   it("cleans prepared artifacts without launching an editor when shutdown interrupts policy loading", async (testContext) => {
     const root = await fixture(testContext);
     const target = join(root, "existing.txt");
@@ -233,6 +235,7 @@ describe("external file review wiring", () => {
     const annotated = await runtime.result("apply-failure", nativeError, true);
     assert.deepEqual(annotated.content[0], nativeError[0]);
     assert.match(annotated.content[1].text, /could not be applied/);
+    assert.equal(annotated.content.length, nativeError.length + 1);
     assert.equal(annotated.isError, undefined);
     assert.equal(JSON.stringify(annotated).includes("private reviewed content"), false);
     assert.equal(await runtime.result("apply-failure", nativeError, true), undefined);
@@ -302,11 +305,52 @@ describe("external file review wiring", () => {
       const annotated = await runtime.result("review", nativeResult.content);
       assert.equal(await readFile(target, "utf8"), "reviewed");
       assert.deepEqual(annotated.content.slice(0, nativeResult.content.length), nativeResult.content);
+      assert.deepEqual(annotated.content.slice(nativeResult.content.length), [
+        { type: "text", text: "The user's reviewed file content was applied after Pi's tool call." },
+        { type: "text", text: singleLineSummary },
+      ]);
       assert.equal(annotated.isError, undefined);
       assert.equal(JSON.stringify(annotated).includes("reviewed bytes"), false);
       await writeFile(target, "later change");
       assert.equal(await runtime.result("review", nativeResult.content), undefined);
       assert.equal(await readFile(target, "utf8"), "later change");
+    });
+  }
+
+  for (const toolName of ["write", "edit"] as const) {
+    it(`reports inserted, modified, and deleted review ranges after successful ${toolName} application`, async (testContext) => {
+      const root = await fixture(testContext);
+      const target = join(root, "existing.txt");
+      const original = "original\n";
+      const proposal = "keep-start\nagent\nkeep-middle\ndelete-me\nkeep-end\n";
+      const reviewed = "intro\nkeep-start\nuser\nkeep-middle\nkeep-end\n";
+      await writeFile(target, original);
+      const runtime = harness(root, async (path) => {
+        await writeFile(path, reviewed);
+      });
+      testContext.after(() => runtime.emit("session_shutdown", {}));
+      const preview: PiFilePreviewInput = toolName === "write"
+        ? { toolName, input: { path: target, content: proposal } }
+        : { toolName, input: { path: target, edits: [{ oldText: original, newText: proposal }] } };
+      assert.equal(await runtime.call("mixed-summary", preview), undefined);
+      assert.equal(await readFile(target, "utf8"), original);
+      const native = await runtime.execute("mixed-summary", preview);
+      assert.equal(await readFile(target, "utf8"), proposal);
+      const annotated = await runtime.result("mixed-summary", native.content);
+      assert.equal(await readFile(target, "utf8"), reviewed);
+      assert.deepEqual(annotated.content.slice(native.content.length), [
+        { type: "text", text: "The user's reviewed file content was applied after Pi's tool call." },
+        {
+          type: "text",
+          text: [
+            summaryHeading,
+            "- Inserted: reviewed line 1",
+            "- Modified: proposal line 2 → reviewed line 3",
+            "- Deleted: proposal line 4; after reviewed line 4",
+          ].join("\n"),
+        },
+      ]);
+      assert.equal(await runtime.result("mixed-summary", native.content), undefined);
     });
   }
 
@@ -323,8 +367,12 @@ describe("external file review wiring", () => {
     assert.equal(await runtime.call("new", preview), undefined);
     await assert.rejects(stat(join(root, "nested")), { code: "ENOENT" });
     const nativeResult = await runtime.execute("new", preview);
-    await runtime.result("new", nativeResult.content);
+    const annotated = await runtime.result("new", nativeResult.content);
     assert.equal(await readFile(target, "utf8"), "");
+    assert.deepEqual(annotated.content.slice(nativeResult.content.length), [
+      { type: "text", text: "The user's reviewed file content was applied after Pi's tool call." },
+      { type: "text", text: `${summaryHeading}\n- Deleted: proposal line 1; reviewed content is empty` },
+    ]);
   });
 
   it("does not launch an editor after native preview failure and lets normal Pi report the native error", async (testContext) => {
@@ -359,6 +407,10 @@ describe("external file review wiring", () => {
     const annotated = await runtime.result("failed-normal", originalContent, true);
     assert.equal(annotated.isError, undefined);
     assert.deepEqual(annotated.content[0], originalContent[0]);
+    assert.deepEqual(annotated.content.slice(originalContent.length), [
+      { type: "text", text: "The user's reviewed file content was applied after Pi's tool call." },
+      { type: "text", text: singleLineSummary },
+    ]);
     assert.equal(await readFile(target, "utf8"), "reviewed");
   });
 });

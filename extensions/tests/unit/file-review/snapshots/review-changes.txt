@@ -1,0 +1,7 @@
+User review changes (agent proposal → reviewed content; line numbers refer to those versions):
+- Inserted: reviewed lines 1–2
+- Modified: proposal lines 3–4 → reviewed line 5
+- Deleted: proposal line 6; after reviewed line 6
+- Inserted: reviewed line 8
+- Modified: proposal line 9 → reviewed lines 10–11
+- Deleted: proposal lines 11–12; after reviewed line 12

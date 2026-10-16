@@ -33,6 +33,7 @@
     "@earendil-works/pi-coding-agent": "*"
   },
   "dependencies": {
+    "diff": "^9.0.0",
     "smol-toml": "^1.8.0",
     "zod": "^4.5.4"
   },

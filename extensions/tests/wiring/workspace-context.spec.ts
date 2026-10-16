@@ -153,6 +153,28 @@ function createWorkspaceContextHarness() {
 }
 
 describe("workspace context wiring", () => {
+  it("injects the commentary protocol once per run while preserving the base prompt and workspace context with or without UI", async (testContext) => {
+    const cwd = await createTemporaryDirectory(testContext);
+    const harness = createWorkspaceContextHarness();
+    const basePrompt = "Base system prompt";
+    for (const hasUI of [true, false]) {
+      const result = (await harness.beforeAgentStart({
+        cwd,
+        systemPrompt: basePrompt,
+        hasUI,
+      })) as { systemPrompt: string };
+      const commentarySections = result.systemPrompt.match(/<teleprompt_commentary_communication_protocol>[\s\S]*?<\/teleprompt_commentary_communication_protocol>/g) ?? [];
+      assert.equal(commentarySections.length, 1);
+      assert.ok(result.systemPrompt.startsWith(`${basePrompt}\n\n${commentarySections[0]}\n\n`));
+      assert.ok(result.systemPrompt.includes(`<workspace role="primary" path="${cwd}" availability="available"`));
+      testContext.assert.fileSnapshot(
+        commentarySections[0],
+        join(import.meta.dirname, "snapshots/commentary-prompt.txt"),
+        { serializers: [(value) => String(value)] },
+      );
+    }
+    assert.deepEqual(harness.observedNotifications, []);
+  });
   it("rereads only additional-workspace sources before every agent run", async (testContext) => {
     const cwd = await createTemporaryDirectory(testContext);
     const additionalWorkspace = join(cwd, "additional-workspace");

@@ -1,4 +1,5 @@
 import type { ToolResultEvent } from "@earendil-works/pi-coding-agent";
+import type { AttemptResult } from "#/errors/index.ts";
 
 export type AppendUserFeedbackAction = {
   type: "append-user-feedback";
@@ -14,6 +15,7 @@ export type ApplyReviewedContentAction = {
   type: "apply-reviewed-content";
   canonicalPath: string;
   content: Buffer;
+  changeSummary?: AttemptResult<string | undefined>;
 };
 
 export type PostToolAction =

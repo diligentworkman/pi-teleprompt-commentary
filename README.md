@@ -41,6 +41,21 @@ Path reservations coordinate intercepted file mutations only within one extensio
 
 **Bash, custom tools, external programs, and filesystem races can bypass these boundaries.** User `!`/`!!` shell commands are not intercepted. Do not treat workspace permission as containment of arbitrary code.
 
+## File commentary
+
+The extension appends a Commentary protocol to the agent's system context on each run, alongside existing workspace context. It guides incremental code editing and temporary conversations in file comments:
+
+```ts
+// @user: Should an empty value return an empty list?
+// @agent: Yes, please handle that case.
+```
+
+Markers name the **recipient**: the agent writes `@user:`, and you write `@agent:` while reviewing its proposal. Use valid comments for the file's language; ordinary documentation does not need a marker.
+
+The prompt instructs the agent to reread accepted file changes, address your notes, and use review-change ranges to locate modifications. Before completing implementation or moving to another file, it should resolve commentary and remove those temporary comments through normal reviewed edits. Outstanding notes must be resolved or explicitly carried forward in chat, not silently deleted. Ordinary documentation and literal marker text in strings, examples, or fixtures must remain intact.
+
+This is agent guidance, not an automatic scanner, watcher, or comment-removal tool. It does not guarantee that every note will be noticed or cleaned up. Command reviews still report the complete edited command rather than file-change summaries, and commentary does not authorize additional execution or bypass permissions.
+
 ## Commands
 
 - `/tc:edit-config` — create the commented starter if absent, then open the configured configuration editor or Pi's fallback editor. Takes no arguments.
@@ -110,6 +125,8 @@ For a configured external file handler:
 A clean unchanged editor exit accepts the original proposal. A clean changed exit authorizes the edited contents, including an intentionally empty file. Prompt acceptance instead discards editor changes and accepts the original tool; rejection blocks. Editor failure leaves a UI prompt viable, but blocks when there is no UI. Unconfirmed editor termination or restoration prevents normal file execution.
 
 Reviewed-content application is attempted even if the normal Pi tool fails. The original result/error state remains visible, with a concise application-success/failure annotation. Pi may queue ordinary messages while review holds the tool call pending; queued messages are not review decisions.
+
+After successful reviewed-content application, the tool result also lists inserted, deleted, and modified line ranges, comparing the **agent's proposal → user-reviewed content**, not the original target. Separate regions appear in file order; replacements include both versions' line ranges, and deletions include an anchor in the reviewed version. Line numbers describe those versions and can become stale after later changes. No full diff or additional review artifacts are retained; deleted content is not preserved by this summary. Unchanged reviews add no summary. Summary-generation failure does not block reviewed-content application: after successful application, the result reports that the summary is unavailable. If application fails, neither a change summary nor a summary-generation error is appended. Command reviews do not receive these line-range summaries.
 
 Preview assumes local native text tools, no replacement of their behavior by another extension, no remote redirection, and the same filesystem for preview and execution. Snapshot bytes do not add binary-editing support. The built-in tool runs once for preview and again for normal execution.
 

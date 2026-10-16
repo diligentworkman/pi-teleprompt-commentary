@@ -4,8 +4,8 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
-import { prepareFileReview } from "#/file-review/policy-preparation.ts";
-import { reviewPreparedFile } from "#/file-review/workflow.ts";
+import { attempt } from "#/errors/index.ts";
+import { prepareFileReview, reviewPreparedFile } from "#/file-review/index.ts";
 import type { ProcessCompletion, ProcessRunner } from "#/process/index.ts";
 import { createRuntimeTemporaryFileStore } from "#/runtime-temporary-files/index.ts";
 
@@ -35,6 +35,7 @@ function deferred<T>() {
 }
 
 describe("prepared file review composition", () => {
+  const singleLineSummary = "User review changes (agent proposal → reviewed content; line numbers refer to those versions):\n- Modified: proposal line 1 → reviewed line 1";
   for (const failed of [false, true]) {
     it(`cleans the original artifact exactly once after ${failed ? "review failure" : "successful review"}`, async (testContext) => {
       const { root, store } = await fixture(testContext);
@@ -188,7 +189,11 @@ describe("prepared file review composition", () => {
         async requestFeedback() { assert.fail("No feedback after external decision"); },
       },
     });
-    assert.deepEqual(outcome, { type: "reviewed", content: Buffer.from("reviewed") });
+    assert.deepEqual(outcome, {
+      type: "reviewed",
+      content: Buffer.from("reviewed"),
+      changeSummary: attempt.value(singleLineSummary),
+    });
     assert.equal(promptSignal?.aborted, true);
     assert.equal(await readFile(target, "utf8"), "original");
   });
@@ -263,8 +268,155 @@ describe("prepared file review composition", () => {
         async requestFeedback() { assert.fail("No UI feedback"); },
       },
     });
-    assert.deepEqual(result, { type: "reviewed", content: Buffer.from("reviewed") });
+    assert.deepEqual(result, {
+      type: "reviewed",
+      content: Buffer.from("reviewed"),
+      changeSummary: attempt.value(singleLineSummary),
+    });
     assert.equal(await readFile(target, "utf8"), "original");
+  });
+
+  describe("when capturing review change summaries", () => {
+    it("compares the user-reviewed content against the agent proposal rather than the original target", async (testContext) => {
+      const { root, store } = await fixture(testContext);
+      const target = join(root, "existing.txt");
+      const original = "original target\n";
+      const proposal = "keep\nagent\n";
+      const reviewed = "keep\nuser\nextra\n";
+      await writeFile(target, original);
+      const prepared = await prepareFileReview({
+        canonicalPath: target,
+        temporaryFileStore: store,
+        async resolveConfiguredAction() {
+          return ["editor", target];
+        },
+      });
+      if (prepared.type !== "prepared") {
+        assert.fail("Expected prepared review");
+      }
+      const result = await reviewPreparedFile({
+        prepared: prepared.value,
+        input: {
+          canonicalPath: target,
+          preview: { toolName: "write", input: { path: target, content: proposal } },
+          toolCallId: "summary-baseline",
+          ctx: { cwd: root } as ExtensionContext,
+          hasUI: false,
+        },
+        dependencies: {
+          processRunner: editorProcess(target, reviewed),
+          async requestDecision() { assert.fail("No UI prompt"); },
+          async requestFeedback() { assert.fail("No UI feedback"); },
+        },
+      });
+      assert.deepEqual(result, {
+        type: "reviewed",
+        content: Buffer.from(reviewed),
+        changeSummary: attempt.value(
+          "User review changes (agent proposal → reviewed content; line numbers refer to those versions):\n- Modified: proposal line 2 → reviewed lines 2–3",
+        ),
+      });
+      assert.equal(await readFile(target, "utf8"), original);
+    });
+    for (const { name, error } of [
+      { name: "an Error instance", error: new Error("summary failed") },
+      { name: "a non-Error object", error: { reason: "summary failed" } },
+      { name: "undefined", error: undefined },
+    ]) {
+      it(`retains reviewed bytes and the exact thrown value when summary generation throws ${name}, while restoring and cleaning up`, async (testContext) => {
+        const { root, store } = await fixture(testContext);
+        const target = join(root, "existing.txt");
+        const original = "original";
+        const reviewed = "reviewed";
+        await writeFile(target, original);
+        const prepared = await prepareFileReview({
+          canonicalPath: target,
+          temporaryFileStore: store,
+          async resolveConfiguredAction() {
+            return ["editor", target];
+          },
+        });
+        if (prepared.type !== "prepared" || prepared.value.originalContentFile === undefined) {
+          assert.fail("Expected original-content artifact");
+        }
+        const artifact = prepared.value.originalContentFile;
+        let cleanupCount = 0;
+        prepared.value.originalContentFile = {
+          path: artifact.path,
+          async cleanup() {
+            cleanupCount += 1;
+            await artifact.cleanup();
+          },
+        };
+        const result = await reviewPreparedFile({
+          prepared: prepared.value,
+          input: {
+            canonicalPath: target,
+            preview: { toolName: "write", input: { path: target, content: "proposal" } },
+            toolCallId: "summary-failure",
+            ctx: { cwd: root } as ExtensionContext,
+            hasUI: false,
+          },
+          dependencies: {
+            processRunner: editorProcess(target, reviewed),
+            async requestDecision() { assert.fail("No UI prompt"); },
+            async requestFeedback() { assert.fail("No UI feedback"); },
+            summarizeChanges() {
+              throw error;
+            },
+          },
+        });
+        assert.equal(result.type, "reviewed");
+        if (result.type !== "reviewed") {
+          assert.fail("Summary failure must not block reviewed content");
+        }
+        assert.deepEqual(result.content, Buffer.from(reviewed));
+        assert.equal(result.changeSummary.success, false);
+        assert.equal(result.changeSummary.error, error);
+        assert.equal(await readFile(target, "utf8"), original);
+        assert.equal(cleanupCount, 1);
+        await assert.rejects(readFile(artifact.path), { code: "ENOENT" });
+      });
+    }
+    it("accepts an unchanged editor result without generating a summary", async (testContext) => {
+      const { root, store } = await fixture(testContext);
+      const target = join(root, "existing.txt");
+      const proposal = "proposal";
+      await writeFile(target, "original");
+      const prepared = await prepareFileReview({
+        canonicalPath: target,
+        temporaryFileStore: store,
+        async resolveConfiguredAction() {
+          return ["editor", target];
+        },
+      });
+      if (prepared.type !== "prepared") {
+        assert.fail("Expected prepared review");
+      }
+      let summaryCalls = 0;
+      const result = await reviewPreparedFile({
+        prepared: prepared.value,
+        input: {
+          canonicalPath: target,
+          preview: { toolName: "write", input: { path: target, content: proposal } },
+          toolCallId: "unchanged-summary",
+          ctx: { cwd: root } as ExtensionContext,
+          hasUI: false,
+        },
+        dependencies: {
+          processRunner: editorProcess(target, proposal),
+          async requestDecision() { assert.fail("No UI prompt"); },
+          async requestFeedback() { assert.fail("No UI feedback"); },
+          summarizeChanges() {
+            summaryCalls += 1;
+            throw new Error("Unchanged reviews must not generate summaries");
+          },
+        },
+      });
+      assert.deepEqual(result, { type: "allowed" });
+      assert.equal(summaryCalls, 0);
+      assert.equal(await readFile(target, "utf8"), "original");
+    });
   });
 
   it("blocks if the prepared snapshot is stale without overwriting intervening content", async (testContext) => {

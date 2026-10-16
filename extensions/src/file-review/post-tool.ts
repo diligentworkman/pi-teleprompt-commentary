@@ -27,6 +27,17 @@ export async function applyFilePostToolActions({
         ? "The user's reviewed file content was applied after Pi's tool call."
         : `The user's reviewed file content could not be applied: ${getErrorMessage(result.error)}`,
     });
+    if (!result.success || action.changeSummary === undefined) {
+      continue;
+    }
+    if (!action.changeSummary.success) {
+      annotations.push({
+        type: "text",
+        text: `Review change summary unavailable: ${getErrorMessage(action.changeSummary.error)}`,
+      });
+    } else if (action.changeSummary.value !== undefined) {
+      annotations.push({ type: "text", text: action.changeSummary.value });
+    }
   }
   for (const action of actions) {
     if (action.type === "append-user-feedback") {
