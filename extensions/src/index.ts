@@ -3,8 +3,13 @@ import type {
   ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
 import { commentarySystemPrompt } from "#/commentary/index.ts";
+import {
+  formatSessionArtifactsContext,
+  resolveSessionArtifactsAccessRoot,
+  warningMessageTemplates as artifactWarningMessageTemplates,
+} from "#/session-artifacts/index.ts";
 import { dispatchHookCommands } from "#/event-hooks/index.ts";
-import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import { reviewBashCommand } from "#/bash-review/index.ts";
 import { applyFilePostToolActions, prepareFileReview, reviewPreparedFile } from "#/file-review/index.ts";
 import { randomUUID } from "node:crypto";
@@ -73,6 +78,7 @@ import {
 
 export type TelepromptCommentaryDependencies = {
   configFilePath: string;
+  agentDirectoryPath?: string;
   fileSystem: ConfigurationFileSystem;
   processRunner: ProcessRunner;
   readConfigurationFile(): Promise<string>;
@@ -194,6 +200,20 @@ export function registerTelepromptCommentary({
       }
     });
     await configLoader.load();
+  });
+  pi.on("agent_start", async (_event, ctx) => {
+    if (shuttingDown) {
+      return;
+    }
+    await dispatchHookCommands({
+      processRunner: dependencies.processRunner,
+      shouldDispatch: () => !shuttingDown,
+      resolveCommands: () => createLoader((message) => {
+        if (ctx.hasUI) {
+          ctx.ui.notify(message, "warning");
+        }
+      }).resolveHooks({ hook: "agent_start", variables: {} }),
+    });
   });
   pi.on("message_end", async (event, ctx) => {
     if (shuttingDown || event.message.role !== "assistant") return;
@@ -352,10 +372,24 @@ export function registerTelepromptCommentary({
     if (requestedPaths.length === 0) {
       return;
     }
+    const artifactRoot = dependencies.agentDirectoryPath === undefined
+      ? attempt.value(undefined)
+      : await resolveSessionArtifactsAccessRoot({
+          agentDirectoryPath: dependencies.agentDirectoryPath,
+          sessionId: ctx.sessionManager.getSessionId(),
+          sessionFilePath: ctx.sessionManager.getSessionFile(),
+        });
+    if (!artifactRoot.success && ctx.hasUI) {
+      attempt.sync(() => ctx.ui.notify(
+        artifactWarningMessageTemplates.directoryUnavailable(getErrorMessage(artifactRoot.error)),
+        "warning",
+      ));
+    }
     const assessment = await assessWorkspacePaths({
       requestedPaths,
       toolName: event.toolName,
       workspacePaths: [ctx.cwd, ...additionalWorkspaces],
+      sessionArtifactsRoot: artifactRoot.success ? artifactRoot.value : undefined,
       cwd: ctx.cwd,
       homeDirectory: homedir(),
     });
@@ -652,7 +686,16 @@ export function registerTelepromptCommentary({
       contextSources,
     });
 
-    return { systemPrompt: `${event.systemPrompt}\n\n${commentarySystemPrompt}\n\n${workspaceContext}` };
+    const artifactRoot = dependencies.agentDirectoryPath === undefined
+      ? attempt.value(undefined)
+      : await resolveSessionArtifactsAccessRoot({
+          agentDirectoryPath: dependencies.agentDirectoryPath,
+          sessionId: ctx.sessionManager.getSessionId(),
+          sessionFilePath: ctx.sessionManager.getSessionFile(),
+        });
+    const artifactContext = formatSessionArtifactsContext(artifactRoot);
+
+    return { systemPrompt: `${event.systemPrompt}\n\n${commentarySystemPrompt}\n\n${workspaceContext}\n\n${artifactContext}` };
   });
   pi.registerCommand(configEditorCommands.edit.name, {
     description: configEditorCommands.edit.description,
@@ -1089,6 +1132,7 @@ export default function telepromptCommentary(pi: ExtensionAPI): void {
     pi,
     dependencies: {
       configFilePath,
+      agentDirectoryPath: getAgentDir(),
       fileSystem: configurationFileSystem,
       processRunner: createProcessRunner(),
       async readConfigurationFile() {

@@ -1,0 +1,3 @@
+<teleprompt_commentary_session_artifacts availability="disabled">
+- Persistent artifacts are disabled for this run. Keep plans and TODOs in the conversation instead of creating a substitute persistent artifact directory.
+</teleprompt_commentary_session_artifacts>

@@ -29,6 +29,7 @@ export const handlerCategories = [
 export const decisions = ["allow", "deny", "prompt"] as const;
 
 export const hookNames = [
+  "agent_start",
   "assistant_message_end",
   "tool_permission_request",
   "agent_settled",
@@ -43,6 +44,7 @@ export const availableHandlerVariables = {
 } as const satisfies Record<HandlerCategory, ReadonlyArray<VariableName>>;
 
 export const availableHookVariables = {
+  agent_start: [],
   assistant_message_end: ["assistant_message_text"],
   tool_permission_request: ["tool_name"],
   agent_settled: [],

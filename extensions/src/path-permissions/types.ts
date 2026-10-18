@@ -2,6 +2,8 @@ export type WorkspacePathAssessmentInput = {
   requestedPaths: ReadonlyArray<string>;
   toolName?: string;
   workspacePaths: ReadonlyArray<string>;
+  // Canonical root supplied by the session-artifact safety check, not an unchecked path.
+  sessionArtifactsRoot?: string;
   cwd: string;
   homeDirectory: string;
 };

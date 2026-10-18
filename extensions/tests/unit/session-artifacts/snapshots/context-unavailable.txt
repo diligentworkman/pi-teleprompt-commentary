@@ -1,0 +1,3 @@
+<teleprompt_commentary_session_artifacts availability="unavailable" reason="filesystem permission denied">
+- The session artifact directory could not be verified. Do not assume automatic artifact access or create a substitute directory; existing workspace permissions and review policies still apply.
+</teleprompt_commentary_session_artifacts>

@@ -33,7 +33,7 @@ With no matching configuration rule:
 - `write` and `edit` require Pi's Accept/Reject review, with optional feedback.
 - Agent `bash` keeps normal Pi behavior.
 - `read`, `grep`, `find`, and `ls` inside permitted workspaces keep normal behavior.
-- Supported path tools outside all workspaces require permission for that call. Approval does not permanently add the directory; file-change review still follows when applicable.
+- Supported path tools outside all workspaces require permission for that call, except within the active session's verified artifact directory. Approval does not permanently add a directory; file-change review still follows when applicable.
 
 The primary workspace is automatically permitted. Additional workspaces are canonical directories explicitly added to the session. Symlink targets are considered during path authorization; similar-looking sibling names do not inherit permission. Same-path file mutations are reserved while review/execution is pending; a conflicting call is blocked rather than silently queued.
 
@@ -55,6 +55,37 @@ Markers name the **recipient**: the agent writes `@user:`, and you write `@agent
 The prompt instructs the agent to reread accepted file changes, address your notes, and use review-change ranges to locate modifications. Before completing implementation or moving to another file, it should resolve commentary and remove those temporary comments through normal reviewed edits. Outstanding notes must be resolved or explicitly carried forward in chat, not silently deleted. Ordinary documentation and literal marker text in strings, examples, or fixtures must remain intact.
 
 This is agent guidance, not an automatic scanner, watcher, or comment-removal tool. It does not guarantee that every note will be noticed or cleaned up. Command reviews still report the complete edited command rather than file-change summaries, and commentary does not authorize additional execution or bypass permissions.
+
+## Session artifacts
+
+Use session artifacts for implementation plans, TODO lists, and task notes spanning any of the session's workspaces:
+
+```text
+<Pi agent directory>/teleprompt-commentary/artifacts/<session-id>/
+```
+
+Pi's agent directory defaults to `~/.pi/agent` and respects `PI_CODING_AGENT_DIR`. The extension announces the **actual absolute artifact path** in system context before each agent run. Announcing or checking the path creates nothing; native writes create parent directories as needed.
+
+### Lifecycle
+
+- Resume reuses the session's directory.
+- `/tree` shares the same directory across branches. Artifact contents are **not rewound** when navigating history.
+- `/new`, `/fork`, and `/clone` select a directory for the new session ID. Existing artifacts are not copied automatically.
+- `--no-session` runs have session IDs but no persistent artifact directory. The prompt directs plans and TODOs into the conversation instead.
+- Artifacts survive extension reload and shutdown. There is no automatic retention cleanup, including when a Pi session is deleted.
+
+Directory selection is keyed by the agent directory and session ID. Reusing a custom session ID under the same agent directory also reuses its artifact directory.
+
+### Access and limitations
+
+- Native `read`, `write`, `edit`, `grep`, `find`, and `ls` calls within the verified directory need no additional outside-workspace approval. Normal write/edit review policies and reservations still apply.
+- Artifacts are not workspaces: they do not contribute instructions, skills, or prompt resources through workspace discovery. This is not a Bash permission exemption.
+- The collection parent, other session directories, and similarly named siblings receive no artifact-specific exemption. Existing workspace permissions still apply independently.
+- A configured agent-directory symlink is supported. Redirects below it that change the expected session-artifact location are rejected; descendant targets escaping the verified root receive no automatic exemption.
+- If verification fails, system context reports artifacts as unavailable. Tool calls fall back to normal workspace permission handling; a warning is attempted when UI is available.
+- Checks are best-effort, not filesystem locks or a sandbox. Use the current advertised path rather than an earlier session's path in inherited history.
+
+Persistent session artifacts are separate from temporary editor-review files. Normal review cleanup removes temporary references, not these plans and notes. Keep project source in its workspace and remove obsolete session artifacts deliberately.
 
 ## Commands
 
@@ -90,7 +121,8 @@ High-level semantics:
 - `diff_editor` applies to existing files; `new_file_editor` applies to new files. They do not fall back to each other. `command_editor` matches the raw agent Bash command.
 - Review handlers accept `allow`, `deny`, `prompt`, or a direct command array. Configuration editors, workspace openers, and hooks accept commands only.
 - Command placeholders expand to exactly one argv element, including spaces and optional prefix/suffix text. Commands launch directly with `shell: false`; shell behavior requires an explicitly configured shell executable.
-- Hook rules are additive: every matching command starts in declaration order, independently of failures. Supported hooks are `assistant_message_end`, `tool_permission_request`, and `agent_settled`.
+- Hook rules are additive: every matching command starts in declaration order, independently of failures. Supported hooks are `agent_start`, `assistant_message_end`, `tool_permission_request`, and `agent_settled`.
+- `agent_start` runs when Pi's agent loop starts, not when a session is opened. Like `agent_settled`, it exposes no variables.
 - Permission hooks run only before a live interactive permission/review prompt, not for explicit allow/deny or unavailable prompts. Assistant-message hooks receive tool-name summaries and text, not tool arguments or thinking.
 
 A clean configuration-editor exit finishes normally. With UI, an unsuccessful configured editor triggers a warning, rereads its actual filesystem effects, and opens Pi's fallback editor. Cancelling that fallback preserves the current file; saving accepts even intentionally empty text. Without UI, there is no fallback editor.
@@ -153,7 +185,7 @@ Prompt-required review and outside-workspace permission fail closed without UI. 
 - **Detached editors:** terminating a CLI does not guarantee its GUI closes. Close stale tabs without saving them over newer work.
 - **Final application failure:** permissions, missing parents, or disk errors can prevent reviewed bytes from being applied. Inspect the target; it may contain normal tool output rather than the reviewed version.
 - **Reload/shutdown:** orderly shutdown aborts tracked reviews, attempts process cleanup/restoration, and cleans owned runtime artifacts. Mid-tool-call reload and abrupt termination remain best-effort; they are not rollback guarantees.
-- **Unexpected prompts:** confirm the target belongs to the active branch's workspace list and that the last matching configuration rule is the intended one.
+- **Unexpected prompts:** confirm the target belongs to the active branch's workspace list or the current verified artifact directory, and that the last matching configuration rule is the intended one. Artifact access does not bypass write/edit review.
 - **No opener/editor:** define the appropriate command handler in the generated TOML and check the executable and waiting flags. Workspace opening requires a configured opener.
 
 Do not blindly restore a Git version if that would discard valuable pre-review uncommitted changes. Inspect the target and recover deliberately.

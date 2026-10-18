@@ -86,6 +86,12 @@ action = "prompt"
 "var:command_string" = '.*'
 action = ["code", "--wait", { var = "command_file_path" }]
 
+# agent_start
+# Runs when Pi's agent loop starts, not when a session is opened.
+# No variables are available. Hook actions must be commands.
+[[hooks.agent_start]]
+action = ["notify-send", "Pi is working"]
+
 # assistant_message_end
 # Available variable: assistant_message_text
 # Hook actions must be commands.

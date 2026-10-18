@@ -15,6 +15,7 @@ export async function assessWorkspacePaths({
   requestedPaths,
   toolName,
   workspacePaths,
+  sessionArtifactsRoot,
   cwd,
   homeDirectory,
 }: WorkspacePathAssessmentInput): Promise<WorkspacePathAssessment> {
@@ -46,9 +47,13 @@ export async function assessWorkspacePaths({
     }
     canonicalPaths.push(resolution.value);
   }
+  // Keep the validated artifact root fixed; resolving it again could trust a replacement symlink.
+  const permittedRoots = sessionArtifactsRoot === undefined
+    ? canonicalWorkspacePaths
+    : [...canonicalWorkspacePaths, sessionArtifactsRoot];
   const outsidePaths = findOutsideWorkspacePaths({
     paths: canonicalPaths,
-    workspacePaths: canonicalWorkspacePaths,
+    workspacePaths: permittedRoots,
   });
   if (outsidePaths.length === 0) {
     return { type: "inside", canonicalPaths };

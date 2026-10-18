@@ -16,7 +16,16 @@ action = ["second", { var = "assistant_message_text", prepend = "<", append = ">
 [[hooks.agent_settled]]
 action = ["settled", "fixed"]
 `;
-  const context = { cwd: "/unused", hasUI: false, ui: {} };
+  const context = {
+    cwd: "/unused",
+    hasUI: false,
+    ui: {},
+    sessionManager: {
+      getBranch() {
+        return [];
+      },
+    },
+  };
   registerTelepromptCommentary({
     pi: {
       on(name: string, handler: (event: any, context: any) => unknown) { handlers.set(name, handler); },
@@ -64,7 +73,7 @@ function createDeferred<T>() {
 }
 
 describe("event hook wiring", () => {
-  for (const eventName of ["message_end", "agent_settled"] as const) {
+  for (const eventName of ["agent_start", "message_end", "agent_settled"] as const) {
     it(`does not launch ${eventName} hooks when shutdown completes during configuration loading`, async () => {
       const resolving = createDeferred<void>();
       const configuration = createDeferred<string>();
@@ -79,11 +88,69 @@ describe("event hook wiring", () => {
       const dispatch = runtime.emit(eventName, event);
       await resolving.promise;
       await runtime.emit("session_shutdown", {});
-      configuration.resolve('[[hooks.assistant_message_end]]\naction = ["late-message"]\n[[hooks.agent_settled]]\naction = ["late-settled"]');
+      configuration.resolve('[[hooks.agent_start]]\naction = ["late-start"]\n[[hooks.assistant_message_end]]\naction = ["late-message"]\n[[hooks.agent_settled]]\naction = ["late-settled"]');
       await dispatch;
       assert.deepEqual(runtime.commands, []);
     });
   }
+  describe("agent_start hooks", () => {
+    it("dispatches only on native agent_start and launches every command in order despite process failures", async () => {
+      const runtime = harness();
+      runtime.setSource([
+        "[[hooks.agent_start]]",
+        'action = ["first", "argument with spaces"]',
+        "[[hooks.agent_start]]",
+        'action = ["second", "next argument"]',
+        "[[hooks.agent_start]]",
+        'action = ["third", "last argument"]',
+      ].join("\n"));
+      await runtime.emit("session_start", {});
+      await runtime.emit("agent_end", {});
+      await runtime.emit("agent_settled", {});
+      assert.deepEqual(runtime.commands, []);
+      assert.equal(await runtime.emit("agent_start", { type: "agent_start" }), undefined);
+      assert.deepEqual(runtime.commands, [
+        ["first", "argument with spaces"],
+        ["second", "next argument"],
+        ["third", "last argument"],
+      ]);
+    });
+    it("rereads configuration for each start and performs no configuration read or launch after shutdown", async () => {
+      let source = '[[hooks.agent_start]]\naction = ["initial-start"]';
+      let readCount = 0;
+      const runtime = harness(async () => {
+        readCount += 1;
+
+        return source;
+      });
+      await runtime.emit("agent_start", {});
+      source = '[[hooks.agent_start]]\naction = ["updated-start"]';
+      await runtime.emit("agent_start", {});
+      assert.deepEqual(runtime.commands, [["initial-start"], ["updated-start"]]);
+      assert.equal(readCount, 2);
+      await runtime.emit("session_shutdown", {});
+      await runtime.emit("agent_start", {});
+      assert.deepEqual(runtime.commands, [["initial-start"], ["updated-start"]]);
+      assert.equal(readCount, 2);
+    });
+    it("continues without launching commands when no start hook is configured", async () => {
+      const runtime = harness();
+      assert.equal(await runtime.emit("agent_start", {}), undefined);
+      assert.deepEqual(runtime.commands, []);
+    });
+    for (const { name, rule } of [
+      { name: "a decision instead of a command", rule: 'action = "allow"' },
+      { name: "a placeholder unavailable to this hook", rule: 'action = ["notify", { var = "assistant_message_text" }]' },
+      { name: "a condition unavailable to this hook", rule: '"var:tool_name" = ".*"\naction = ["notify"]' },
+    ]) {
+      it(`does not launch an invalid start hook using ${name}`, async () => {
+        const runtime = harness();
+        runtime.setSource(`[[hooks.agent_start]]\n${rule}`);
+        assert.equal(await runtime.emit("agent_start", {}), undefined);
+        assert.deepEqual(runtime.commands, []);
+      });
+    }
+  });
   it("filters non-assistant messages and places tool summaries before assistant descriptions", async () => {
     const runtime = harness();
     for (const role of ["user", "toolResult", "custom"]) {

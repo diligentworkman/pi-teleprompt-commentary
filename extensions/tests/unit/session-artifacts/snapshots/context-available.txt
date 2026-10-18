@@ -1,0 +1,8 @@
+<teleprompt_commentary_session_artifacts availability="available" path="SESSION_ARTIFACT_DIRECTORY">
+- Store session implementation plans, TODO lists, and task notes here, not project source files.
+- Use native file tools. This directory needs no outside-workspace approval; normal write/edit review still applies.
+- The directory is created when a file is written, not merely when its path is announced.
+- Artifacts persist after shutdown. Resume and /tree reuse this session's directory; /new, /fork, and /clone use separate directories.
+- Branches within the same session share these files. Tree navigation does not restore earlier artifact contents.
+- Other sessions' directories and symlink escapes have no automatic access exemption. This is not a Bash permission exemption or a sandbox.
+</teleprompt_commentary_session_artifacts>
