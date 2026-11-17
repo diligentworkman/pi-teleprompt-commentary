@@ -2,7 +2,7 @@ import { attempt } from "#/errors/index.ts";
 import { randomUUID } from "node:crypto";
 import { chmod, mkdtemp, open, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import type {
   RuntimeTemporaryFileStore,
   RuntimeTemporaryFileStoreDependencies,
@@ -55,15 +55,18 @@ export function createRuntimeTemporaryFileStore(
   };
 
   return {
-    async createFile({ kind, content }) {
+    async createFile({ kind, content, sourceFilePath }) {
       const activeDirectoryPath = await ensureDirectory();
+      const extension =
+        sourceFilePath === undefined ? ".txt" : extname(sourceFilePath);
       const filePath = join(
         activeDirectoryPath,
-        `${kind}-${dependencies.createFileId()}.txt`,
+        `${kind}-${dependencies.createFileId()}${extension}`,
       );
-      const handle = dependencies.openFile === undefined
-        ? await open(filePath, "wx", 0o600)
-        : await dependencies.openFile(filePath);
+      const handle =
+        dependencies.openFile === undefined
+          ? await open(filePath, "wx", 0o600)
+          : await dependencies.openFile(filePath);
       filePaths.add(filePath);
       const writeAttempt = await attempt(() => handle.writeFile(content));
       const closeAttempt = await attempt(() => handle.close());

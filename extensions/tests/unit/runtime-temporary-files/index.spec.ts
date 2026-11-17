@@ -149,6 +149,45 @@ describe("runtime temporary file storage", () => {
       }
     });
   });
+  describe("when an artifact has a source file", () => {
+    for (const { sourceName, extension } of [
+      { sourceName: "module.ts", extension: ".ts" },
+      { sourceName: "component.tsx", extension: ".tsx" },
+      { sourceName: "types.d.ts", extension: ".ts" },
+      { sourceName: "archive.tar.gz", extension: ".gz" },
+      { sourceName: "module.TS", extension: ".TS" },
+      { sourceName: "README", extension: "" },
+      { sourceName: ".env", extension: "" },
+      { sourceName: ".env.local", extension: ".local" },
+    ]) {
+      it(`uses the final extension from ${sourceName} while preserving bytes, private storage, and cleanup`, async (testContext) => {
+        const temporaryRootPath = await createTemporaryRoot(testContext);
+        const sourceFilePath = join(temporaryRootPath, "source", sourceName);
+        const content = Uint8Array.from([0, 255, 10]);
+        const store = createRuntimeTemporaryFileStore({
+          temporaryRootPath,
+          createFileId: createFileIdFactory(["reference-id"]),
+        });
+        const file = await store.createFile({
+          kind: "original-content",
+          content,
+          sourceFilePath,
+        });
+        assert.equal(basename(file.path), `original-content-reference-id${extension}`);
+        assert.equal(dirname(dirname(file.path)), temporaryRootPath);
+        assert.deepEqual(await readFile(file.path), Buffer.from(content));
+        assert.equal(await pathExists(dirname(sourceFilePath)), false);
+        if (process.platform !== "win32") {
+          assert.equal((await stat(file.path)).mode & 0o777, 0o600);
+        }
+        await file.cleanup();
+        await file.cleanup();
+        assert.equal(await pathExists(file.path), false);
+        await store.cleanup();
+        assert.deepEqual(await readdir(temporaryRootPath), []);
+      });
+    }
+  });
   describe("when several artifacts belong to one runtime", () => {
     it("shares one directory across concurrent first uses and removes all artifacts at shutdown", async (testContext) => {
       const temporaryRootPath = await createTemporaryRoot(testContext);

@@ -9,9 +9,11 @@ export type RuntimeTemporaryFileStore = {
   createFile({
     kind,
     content,
+    sourceFilePath,
   }: {
     kind: RuntimeTemporaryFileKind;
     content: string | Uint8Array;
+    sourceFilePath?: string;
   }): Promise<RuntimeTemporaryFile>;
   cleanup(): Promise<void>;
 };

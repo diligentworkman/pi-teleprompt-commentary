@@ -14,8 +14,11 @@ export async function createOriginalContentArtifact({
   temporaryFileStore: RuntimeTemporaryFileStore;
 }): Promise<AttemptResult<RuntimeTemporaryFile | undefined>> {
   if (snapshot.type === "new") return attempt.value(undefined);
-  return attempt(() => temporaryFileStore.createFile({
-    kind: "original-content",
-    content: snapshot.originalContent,
-  }));
+  return attempt(() =>
+    temporaryFileStore.createFile({
+      kind: "original-content",
+      content: snapshot.originalContent,
+      sourceFilePath: snapshot.canonicalPath,
+    }),
+  );
 }

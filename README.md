@@ -149,7 +149,7 @@ Use a **waiting editor command**, such as an appropriate `--wait` invocation. Op
 For a configured external file handler:
 
 1. Snapshot original state and run Pi's real local built-in `write`/`edit` definition to put the proposal on the **actual target**.
-2. Open the editor on that target; existing-file review also receives a temporary original-content reference.
+2. Open the editor on that target; existing-file review also receives a temporary original-content reference. The reference preserves the canonical target's final extension (for example, `.tsx`) to support editor language detection. Extensionless files and dotfiles such as `.env` produce extensionless references; Bash command artifacts remain `.txt`.
 3. With UI, race the editor against Pi's Accept/Reject prompt. Without UI, the editor is the sole decision source.
 4. Restore original state before allowing the normal Pi tool execution.
 5. If the editor successfully changed the content, apply the captured reviewed bytes after normal execution and annotate the tool result.
